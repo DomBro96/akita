@@ -3,36 +3,36 @@ package db
 type (
 
 	AkitaDb interface {
-		Set(key string, value []byte) (bool, error)
-		Get(key string) ([]byte, error)
-		Del(key string) ([]byte, error)
+		Set(key []byte, value []byte) (bool, error)
+		Get(key []byte) ([]byte, error)
+		Del(key []byte) ([]byte, error)
 	}
 
 	HashDb struct {
 		*DataHeader
-		kb []byte
-		vb []byte 	// value
+		key []byte
+		Value []byte 	// value
 	}
 
 	DataHeader struct {
-		ks int32 	// key size
-		vs int32 	// value size
-		crc int32 	// judge the file is
-		flag int32 	// type of write to file
+		Ks int32 	// key size
+		Vs int32 	// value size
+		Crc int32 	// judge the file is
+		Flag int32 	// type of write to file
 	}
 
 )
 
 
-func (*HashDb) Set(key string, value []byte) (error){
+func (*HashDb) Set(key []byte, value []byte) (error){
 
 	return nil
 }
 
-func (*HashDb) Get(key string) ([]byte, error) {
+func (*HashDb) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (*HashDb) Del(key string) ([]byte, error) {
+func (*HashDb) Del(key []byte) ([]byte, error) {
 	return nil, nil
 }

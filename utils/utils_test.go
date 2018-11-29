@@ -16,7 +16,7 @@ func TestIntToByteSlice(t *testing.T) {
 	if err != nil {
 		fmt.Println("int to  byte slice  err: ", err)
 	}
-	fmt.Println(bufByte)
+	fmt.Println(bufByte, len(bufByte))
 
 	i2, err := ByteSliceToInt(bufByte)
 	if err != nil {
@@ -28,8 +28,24 @@ func TestIntToByteSlice(t *testing.T) {
 func TestStringToByteSlice(t *testing.T) {
 	s := "hello Wold ！"
 	bufByte:= StringToByteSlice(s)
-	fmt.Println(bufByte)
+	fmt.Println(bufByte, len(bufByte))
 	fmt.Println(len(bufByte))
 	s1 := ByteSliceToString(bufByte)
 	fmt.Println(s1)
 }
+
+func TestUintToByteSlice(t *testing.T) {
+	var u uint32 = 255
+	buf, err := UintToByteSlice(u)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(buf)
+
+	u0, err := ByteSliceToUint(buf)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(u0)
+}
+

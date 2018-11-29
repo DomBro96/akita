@@ -23,16 +23,16 @@ type (
 
 )
 
-
-func (*HashDb) Set(key []byte, value []byte) (error){
-
+func (db *HashDb) Set(key []byte, value []byte) (error){
 	return nil
 }
 
-func (*HashDb) Get(key []byte) ([]byte, error) {
+func (db *HashDb) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (*HashDb) Del(key []byte) ([]byte, error) {
+func (db *HashDb)Del(key []byte) ([]byte, error) {
 	return nil, nil
 }
+
+

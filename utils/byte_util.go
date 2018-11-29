@@ -20,7 +20,22 @@ func IntToByteSlice(i int32) ([]byte, error) {
 	err := binary.Write(buf, binary.BigEndian, i)
 	bufByte := buf.Bytes()
 	return bufByte, err
+}
 
+func UintToByteSlice(u uint32) ([]byte, error)  {
+	s1  := make([]byte, 0)
+	buf := bytes.NewBuffer(s1)
+	err := binary.Write(buf, binary.BigEndian, u)
+	bufByte := buf.Bytes()
+	return bufByte, err
+}
+
+func ByteSliceToUint(bufByte []byte) (uint32, error) {
+	buf := bytes.NewBuffer(bufByte)
+	var u uint32
+	//同样使用大端法读取
+	err := binary.Read(buf, binary.BigEndian, &u)
+	return u, err
 }
 
 func StringToByteSlice(key string) []byte   {

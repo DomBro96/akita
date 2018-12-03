@@ -1,13 +1,11 @@
 package db
 
 type AkitaDb struct {
-
 }
 
 
 
 type Connection struct {
-
 }
 
 
@@ -28,4 +26,7 @@ func (conn *Connection) Delete(key string) (bool, error)  {					//删除数据
 	return false,  nil
 }
 
+func (conn *Connection) Close() error {										//关闭连接
+	return nil
+}
 

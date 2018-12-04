@@ -30,18 +30,18 @@ func ReadFileToByte(filePath string, offset int64) ([]byte, error) {
 
 
 // write a byte slice to the file, return offset and error
-func WriteFileWithByte(filePath string, offset int64, buff []byte) (int, error) {
+func WriteFileWithByte(filePath string, offset int64, buff []byte) (int64, error) {
 	target, err :=  os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_RDWR, 0664)
 	if err != nil {
 		fmt.Printf("open file error: %s\n", err)
 		return 0, err
 	}
-	nOffset, err := target.WriteAt(buff, offset)
+	cOffset, err := target.WriteAt(buff, offset)
 	if err != nil {
 		fmt.Printf("write file error； %s\n", err)
 		return 0, err
 	}
-	return nOffset, nil
+	return int64(cOffset), nil
 }
 
 

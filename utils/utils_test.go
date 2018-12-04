@@ -49,3 +49,13 @@ func TestUintToByteSlice(t *testing.T) {
 	fmt.Println(u0)
 }
 
+func TestAppendByteSlice(t *testing.T) {
+	bs0, err := IntToByteSlice(10)
+	bs1, err := IntToByteSlice(15)
+	bs2, err := IntToByteSlice(20)
+	if err != nil {
+		fmt.Printf("int to slice err %s", err)
+	}
+	bs3 := AppendByteSlice(bs0, bs1, bs2)
+	fmt.Println(bs3)
+}

@@ -49,3 +49,11 @@ func ByteSliceToString(data []byte) string  {
 	 key = string(data[:])
 	 return key
 }
+
+func AppendByteSlice(bs ...[]byte) []byte {		// 将若干切片追加到一起
+	buf := make([]byte, 0)
+	for _, b := range bs {
+		buf = append(buf, b...)
+	}
+	return buf
+}

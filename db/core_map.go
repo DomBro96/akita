@@ -1,22 +1,23 @@
-package coremap
+package db
 
-import "akita/db"
 
 type coreMap struct {
 	Map       map[string]int64
 	CurOffset int64
 }
 
-var MapInstance *coreMap
+var mapInstance *coreMap
 
+// 全局只有一个 coreMap 的实例
 func SingletonCoreMap() *coreMap {
-	if MapInstance == nil {
-		MapInstance = &coreMap{}
+	if mapInstance == nil {
+		mapInstance = &coreMap{Map: map[string]int64{}, CurOffset: 0,}
 	}
-	return MapInstance
+	return mapInstance
 }
 
-func (cm *coreMap) set(record *db.AkitaRecord) (bool, error) {
+func (cm *coreMap) set(record *DataRecord) (bool, error) { // 将记录放入索引
+
 	return false, nil
 }
 

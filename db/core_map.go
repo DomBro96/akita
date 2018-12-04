@@ -1,5 +1,6 @@
 package db
 
+import "akita/common"
 
 type coreMap struct {
 	Map       map[string]int64
@@ -16,13 +17,17 @@ func SingletonCoreMap() *coreMap {
 	return mapInstance
 }
 
-func (cm *coreMap) set(record *DataRecord) (bool, error) { // 将记录放入索引
-
-	return false, nil
+func (cm *coreMap) set(key string) error { 				// 将记录放入索引
+	cm.Map[key] = cm.CurOffset
+	return nil
 }
 
-func (cm *coreMap) get(key string) (int64, error)  {
-	return 0, nil
+func (cm *coreMap) get(key string) (int64, error)  {	// 在索引中查找
+	value, exists := cm.Map[key]
+	if !exists {
+		return -1, common.ErrNoSuchRecord
+	}
+	return value, nil
 }
 
 func (cm *coreMap) del(key string) (bool, error) {

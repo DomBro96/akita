@@ -1,8 +1,8 @@
 package db
 
 import (
+	"akita/common"
 	"akita/utils"
-	"fmt"
 )
 
 type (
@@ -21,17 +21,33 @@ type (
 	}
 )
 
-func (record *DataRecord) WriteRecord (dataFile string, offset int) (bool, error) {	// 将记录写入
+// 向数据文件中写入一条记录
+func (record *DataRecord) WriteRecord (dataFile string, offset int64) (int64, error) {	// 将记录写入
 	ksBuf, err := utils.IntToByteSlice(record.dateHeader.Ks)
 	if err != nil {
-		return false, fmt.Errorf(err)
+		return 0, err
 	}
 	vsBuf, err := utils.IntToByteSlice(record.dateHeader.Vs)
+	if err != nil {
+		return 0, err
+	}
 	flagBuf, err := utils.IntToByteSlice(record.dateHeader.Flag)
+	if err != nil {
+		return 0, err
+	}
 	recordBuf := utils.AppendByteSlice(ksBuf, vsBuf, flagBuf, record.key, record.value)
 	crc32  := utils.CreateCrc32(recordBuf)
-	crcBuf, _ := utils.UintToByteSlice(crc32)
+	crcBuf, err := utils.UintToByteSlice(crc32)
+	if err != nil {
+		return 0, err
+	}
 	recordBuf = append(recordBuf, crcBuf...)
-	return false, nil
+	curOffset, err := common.WriteFileWithByte(dataFile, offset, recordBuf)
+	if err != nil {
+		return 0, err
+	}
+	return curOffset, nil
 }
+
+
 

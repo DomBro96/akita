@@ -23,15 +23,15 @@ type (
 
 // 向数据文件中写入一条记录
 func (record *DataRecord) WriteRecord (dataFile string, offset int64) (int64, error) {	// 将记录写入
-	ksBuf, err := utils.IntToByteSlice(record.dateHeader.Ks)
+	ksBuf, err := utils.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
 		return 0, err
 	}
-	vsBuf, err := utils.IntToByteSlice(record.dateHeader.Vs)
+	vsBuf, err := utils.Int32ToByteSlice(record.dateHeader.Vs)
 	if err != nil {
 		return 0, err
 	}
-	flagBuf, err := utils.IntToByteSlice(record.dateHeader.Flag)
+	flagBuf, err := utils.Int32ToByteSlice(record.dateHeader.Flag)
 	if err != nil {
 		return 0, err
 	}

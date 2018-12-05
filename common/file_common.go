@@ -6,14 +6,12 @@ import (
 )
 
 // read the file to a byte slice
-func ReadFileToByte(filePath string, offset int64) ([]byte, error) {
+func ReadFileToByte(filePath string, offset int64, bufLen int64) ([]byte, error) {
 	source, err := os.OpenFile(filePath, os.O_RDONLY, 0664)
+	defer source.Close()
 	if err != nil{
-		fmt.Printf("read file error: %s\n", err)
 		return nil, err
 	}
-	defer source.Close()
-	bufLen, err := GetFileSize(source)
 	if err != nil {
 		fmt.Printf("get file size error: %s\n", err)
 		return nil, err
@@ -32,6 +30,7 @@ func ReadFileToByte(filePath string, offset int64) ([]byte, error) {
 // write a byte slice to the file, return offset and error
 func WriteFileWithByte(filePath string, offset int64, buff []byte) (int64, error) {
 	target, err :=  os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_RDWR, 0664)
+	defer target.Close()
 	if err != nil {
 		fmt.Printf("open file error: %s\n", err)
 		return 0, err
@@ -46,10 +45,15 @@ func WriteFileWithByte(filePath string, offset int64, buff []byte) (int64, error
 
 
 
-func GetFileSize(file *os.File) (int64, error) {
-	 bufLen, err := file.Seek(0, 2)
-	 defer file.Seek(0, 0)
- 	 return bufLen, err
+func GetFileSize(filePath string) (int64, error) {
+	 source, err := os.OpenFile(filePath, os.O_RDONLY, 0664)
+	 if err != nil{
+		return 0, err
+	 }
+	 bufLen, err := source.Seek(0, 2)
+	 defer source.Close()
+	 defer source.Seek(0, 0)
+	 return bufLen, err
 }
 
 

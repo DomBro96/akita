@@ -5,15 +5,15 @@ import (
 	"encoding/binary"
 )
 
-func ByteSliceToInt(bufByte []byte) (int32, error)  {
+func ByteSliceToInt64(bufByte []byte) (int64, error)  {
 	buf := bytes.NewBuffer(bufByte)
-	var i int32
+	var i int64
 	//同样使用大端法读取
 	err := binary.Read(buf, binary.BigEndian, &i)
 	return i, err
 }
 
-func IntToByteSlice(i int32) ([]byte, error) {
+func Int32ToByteSlice(i int32) ([]byte, error) {
 	s1 := make([]byte, 0)
 	buf := bytes.NewBuffer(s1)
 	// int64 to []byte, 使用大端法

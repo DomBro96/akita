@@ -36,7 +36,7 @@ func (record *DataRecord) WriteRecord (dataFile string, offset int64) (int64, er
 		return 0, err
 	}
 	recordBuf := utils.AppendByteSlice(ksBuf, vsBuf, flagBuf, record.key, record.value)
-	crc32  := utils.CreateCrc32(recordBuf)
+	crc32 := utils.CreateCrc32(recordBuf)
 	crcBuf, err := utils.UintToByteSlice(crc32)
 	if err != nil {
 		return 0, err
@@ -49,5 +49,7 @@ func (record *DataRecord) WriteRecord (dataFile string, offset int64) (int64, er
 	return curOffset, nil
 }
 
-
+func (record *DataRecord) ReadRecord () ([] byte, error)  {
+	return nil, nil
+}
 

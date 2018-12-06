@@ -17,11 +17,40 @@ func TestSingletonCoreMap(t *testing.T) {
 }
 
 func TestDataRecord_WriteRecord(t *testing.T) {
-	record := DataRecord{}
-	ok, err := record.WriteRecord(common.DefaultDataFile, 0)
-	fmt.Println(ok, err)
-	t.Log(err)
-	if ok != true {
-		t.Error(err)
+	 conn := &Connection{}
+	 ok, err := conn.Insert("akita", "/Users/dombro/go/src/akita/file_test/akita_src.jpg")
+	 if ok {
+	 	fmt.Println("insert success. ")
+	 }
+	 if err != nil {
+	 	fmt.Println(err)
+	 }
+	 size0, err := common.GetFileSize(common.DefaultDataFile)
+	 if err != nil {
+	 	fmt.Println(err)
+	 }
+	 fmt.Println(size0)
+	value, err := conn.Seek("akita")
+	if err != nil {
+		fmt.Println(err)
 	}
+	fmt.Println(SingletonCoreMap().CurOffset)
+	size, err := common.WriteFileWithByte("/Users/dombro/go/src/akita/file_test/akita_copy.jpg", 0, value)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(size)
+}
+
+func TestConnection_Seek(t *testing.T) {
+	conn := &Connection{}
+	value, err := conn.Seek("akita")
+	if err != nil {
+		fmt.Println(err)
+	}
+	size, err := common.WriteFileWithByte("/Users/dombro/go/src/akita/file_test/akita_copy.jpg", 0, value)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(size)
 }

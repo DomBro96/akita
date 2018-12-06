@@ -29,7 +29,7 @@ func ReadFileToByte(filePath string, offset int64, bufLen int64) ([]byte, error)
 
 // write a byte slice to the file, return offset and error
 func WriteFileWithByte(filePath string, offset int64, buff []byte) (int64, error) {
-	target, err :=  os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_RDWR, 0664)
+	target, err :=  os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	defer target.Close()
 	if err != nil {
 		fmt.Printf("open file error: %s\n", err)

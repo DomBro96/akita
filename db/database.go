@@ -3,6 +3,7 @@ package db
 import (
 	"akita/common"
 	"akita/utils"
+	"fmt"
 	"sync/atomic"
 )
 
@@ -44,7 +45,7 @@ func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//�
 	offset := akMap.CurOffset
 	curOffset, err := dataRecord.WriteRecord(common.DefaultDataFile, offset)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	akMap.set(key)													 	// 设置 map 索引
 	atomic.CompareAndSwapInt64(&akMap.CurOffset, offset, curOffset)		// 设置当前 offset
@@ -62,36 +63,42 @@ func (conn *Connection) Seek(key string) ([]byte, error) {				// 查找数据
 	if err != nil {
 		return nil, err
 	}
-	ksBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset, 4)
+	ksBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset, common.KsByteLength)
+
 	if err != nil {
 		return nil, err
 	}
-	vsBuf, err  := common.ReadFileToByte(common.DefaultDataFile, offset + 4, 4)
+	vsBuf, err  := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength, common.VsByteLength)
 	if err != nil {
 		return nil, err
 	}
-	flagBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + 8, 4)
+	flagBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength, common.FlagByteLength)
 	if err != nil {
 		return nil, err
 	}
-	ks, err := utils.ByteSliceToInt64(ksBuf)
-	keyBuf, err  := common.ReadFileToByte(common.DefaultDataFile, offset + 12, ks)
+	ks, err := utils.ByteSliceToInt32(ksBuf)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	keyBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength + common.FlagByteLength, int64(ks))
 	if err != nil {
 		return nil, err
 	}
-	vs, err := utils.ByteSliceToInt64(vsBuf)
-	valueBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + 12 + ks, vs)
+	fmt.Println(utils.ByteSliceToString(keyBuf))
+	vs, err := utils.ByteSliceToInt32(vsBuf)
+	valueBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength + common.FlagByteLength + int64(ks), int64(vs))
 	if err != nil {
 		return nil, err
 	}
+	crcBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength + common.FlagByteLength + int64(ks) + int64(vs), common.CrcByteLength)
+	getCrc, err := utils.ByteSliceToUint(crcBuf)
 	crcSlice := utils.AppendByteSlice(ksBuf, vsBuf, flagBuf, keyBuf, valueBuf)
 	crcCheck := utils.CreateCrc32(crcSlice)
-	crcBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + 12 + ks + vs, 4)
-	getCrc, err := utils.ByteSliceToUint(crcBuf)
 	if crcCheck != getCrc {								// 如果 crc 检验不成功
 		return nil, common.ErrDataHasBeenModified
 	}
-	return nil, nil
+	return valueBuf, nil
 }
 
 func (conn *Connection) Delete(key string) (bool, error)  {				// 删除数据

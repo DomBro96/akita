@@ -18,7 +18,7 @@ func TestIntToByteSlice(t *testing.T) {
 	}
 	fmt.Println(bufByte, len(bufByte))
 
-	i2, err := ByteSliceToInt64(bufByte)
+	i2, err := ByteSliceToInt32(bufByte)
 	if err != nil {
 		fmt.Println(" byte slice to int err: ", err)
 	}

@@ -1,10 +1,5 @@
 package db
 
-import (
-	"akita/common"
-	"akita/utils"
-)
-
 type (
 	DataHeader struct {
 		Ks   int32  // key size
@@ -21,35 +16,4 @@ type (
 	}
 )
 
-// 向数据文件中写入一条记录
-func (record *DataRecord) WriteRecord (dataFile string, offset int64) (int64, error) {	// 将记录写入
-	ksBuf, err := utils.Int32ToByteSlice(record.dateHeader.Ks)
-	if err != nil {
-		return 0, err
-	}
-	vsBuf, err := utils.Int32ToByteSlice(record.dateHeader.Vs)
-	if err != nil {
-		return 0, err
-	}
-	flagBuf, err := utils.Int32ToByteSlice(record.dateHeader.Flag)
-	if err != nil {
-		return 0, err
-	}
-	recordBuf := utils.AppendByteSlice(ksBuf, vsBuf, flagBuf, record.key, record.value)
-	crc32 := utils.CreateCrc32(recordBuf)
-	crcBuf, err := utils.UintToByteSlice(crc32)
-	if err != nil {
-		return 0, err
-	}
-	recordBuf = append(recordBuf, crcBuf...)
-	curOffset, err := common.WriteFileWithByte(dataFile, offset, recordBuf)
-	if err != nil {
-		return 0, err
-	}
-	return curOffset, nil
-}
-
-func (record *DataRecord) ReadRecord () ([] byte, error)  {
-	return nil, nil
-}
 

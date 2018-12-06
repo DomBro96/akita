@@ -3,7 +3,6 @@ package db
 import (
 	"akita/common"
 	"akita/utils"
-	"fmt"
 	"sync/atomic"
 )
 
@@ -43,28 +42,37 @@ func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//�
 	dataRecord := &DataRecord{dateHeader: header, key: keyBuf, value: valueBuf}
 	akMap  := SingletonCoreMap()
 	offset := akMap.CurOffset
-	curOffset, err := dataRecord.WriteRecord(common.DefaultDataFile, offset)
-	if err != nil {
+	offsetChan := make(chan int64)
+	errorChan  := make(chan error)
+
+	go func(filePath string, from int64, record *DataRecord) {
+		curOffset, err := WriteRecord(filePath, from, record)
+		offsetChan <- curOffset
+		errorChan  <- err
+	}(common.DefaultDataFile, offset, dataRecord)
+
+	if err = <-errorChan; err != nil {
 		return false, err
 	}
-	akMap.set(key)													 	// 设置 map 索引
-	atomic.CompareAndSwapInt64(&akMap.CurOffset, offset, curOffset)		// 设置当前 offset
+
+	akMap.set(key)													 	     // 设置 map 索引
+	atomic.CompareAndSwapInt64(&akMap.CurOffset, offset, <-offsetChan)		 // 设置当前 offset
 	return true, nil
 }
 
 func (conn *Connection) Seek(key string) ([]byte, error) {				// 查找数据
 	//TODO:
-	//1. 在索引中拿到offset
-	//2. 如果存在该数据， 读取出 value -> []byte
-	// 1) 判断文件是否被改动， 若改动返回异常
-	// 2) 若未改动， 返回[]byte
+	// 1. 减少不必要的文件读写
+	// 2. 使用 slice 特性
+	// 3. 使用 goroutine
 	akMap := SingletonCoreMap()
-	offset, err := akMap.get(key)										// 获取该记录的起始 offset
+	offset, err := akMap.get(key)										    // 获取该记录的起始 offset
 	if err != nil {
 		return nil, err
 	}
+	crc32Chan := make(chan uint32, 2) 										// 通道中传递检验的 crc32 和取出该记录的crc32
+	// TODO: 1. 使用带有缓冲的通道  2. 只对文件进行两次读取
 	ksBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset, common.KsByteLength)
-
 	if err != nil {
 		return nil, err
 	}
@@ -78,14 +86,12 @@ func (conn *Connection) Seek(key string) ([]byte, error) {				// 查找数据
 	}
 	ks, err := utils.ByteSliceToInt32(ksBuf)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	keyBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength + common.FlagByteLength, int64(ks))
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(utils.ByteSliceToString(keyBuf))
 	vs, err := utils.ByteSliceToInt32(vsBuf)
 	valueBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength + common.FlagByteLength + int64(ks), int64(vs))
 	if err != nil {
@@ -95,7 +101,7 @@ func (conn *Connection) Seek(key string) ([]byte, error) {				// 查找数据
 	getCrc, err := utils.ByteSliceToUint(crcBuf)
 	crcSlice := utils.AppendByteSlice(ksBuf, vsBuf, flagBuf, keyBuf, valueBuf)
 	crcCheck := utils.CreateCrc32(crcSlice)
-	if crcCheck != getCrc {								// 如果 crc 检验不成功
+	if crcCheck != getCrc {												// 如果 crc 检验不成功
 		return nil, common.ErrDataHasBeenModified
 	}
 	return valueBuf, nil
@@ -105,7 +111,41 @@ func (conn *Connection) Delete(key string) (bool, error)  {				// 删除数据
 	return false,  nil
 }
 
+// 向数据文件中写入一条记录
+func WriteRecord (dataFile string, offset int64, record * DataRecord) (int64, error) {	// 将记录写入
+	ksBuf, err := utils.Int32ToByteSlice(record.dateHeader.Ks)
+	if err != nil {
+		return 0, err
+	}
+	vsBuf, err := utils.Int32ToByteSlice(record.dateHeader.Vs)
+	if err != nil {
+		return 0, err
+	}
+	flagBuf, err := utils.Int32ToByteSlice(record.dateHeader.Flag)
+	if err != nil {
+		return 0, err
+	}
+	recordBuf := utils.AppendByteSlice(ksBuf, vsBuf, flagBuf, record.key, record.value)
+	crc32 := utils.CreateCrc32(recordBuf)
+	crcBuf, err := utils.UintToByteSlice(crc32)
+	if err != nil {
+		return 0, err
+	}
+	recordBuf = append(recordBuf, crcBuf...)
+	curOffset, err := common.WriteFileWithByte(dataFile, offset, recordBuf)
+	if err != nil {
+		return 0, err
+	}
+	return curOffset, nil
+}
+
+func ReadRecord(filePath string )  {
+
+}
+
 func (conn *Connection) Close() error {									// 关闭连接, 使 Connection 实现 io.Closer
 	return nil
 }
+
+
 

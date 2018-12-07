@@ -3,13 +3,15 @@ package common
 import "errors"
 
 const (
-	DefaultDataFile = "/tmp/akdb/test.dat"
 	K               = 1024
 	M               = 1024 * 1024
 	KsByteLength	= 4
 	VsByteLength    = 4
 	FlagByteLength  = 4
 	CrcByteLength   = 4
+	KvsByteLength	= KsByteLength + VsByteLength
+	KvsfByteLength	= KsByteLength + VsByteLength + FlagByteLength
+	DefaultDataFile = "/tmp/akdb/test.dat"
 )
 
 var (

@@ -40,7 +40,7 @@ func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//�
 	}
 	header := &DataHeader{Ks: int32(ks), Vs: int32(vs), Flag: 1}
 	dataRecord := &DataRecord{dateHeader: header, key: keyBuf, value: valueBuf}
-	akMap  := SingletonCoreMap()
+	akMap  := SingletonAkitaMap()
 	offset := akMap.CurOffset
 	offsetChan := make(chan int64)
 	errorChan  := make(chan error)
@@ -60,54 +60,29 @@ func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//�
 	return true, nil
 }
 
-func (conn *Connection) Seek(key string) ([]byte, error) {				// 查找数据
-	//TODO:
-	// 1. 减少不必要的文件读写
-	// 2. 使用 slice 特性
-	// 3. 使用 goroutine
-	akMap := SingletonCoreMap()
-	offset, err := akMap.get(key)										    // 获取该记录的起始 offset
+func (conn *Connection) Seek(key string) ([]byte, error) {				 // 查找数据
+	akMap := SingletonAkitaMap()
+	offset, err := akMap.get(key)										 // 获取该记录的起始 offset
 	if err != nil {
 		return nil, err
 	}
-	crc32Chan := make(chan uint32, 2) 										// 通道中传递检验的 crc32 和取出该记录的crc32
-	// TODO: 1. 使用带有缓冲的通道  2. 只对文件进行两次读取
-	ksBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset, common.KsByteLength)
-	if err != nil {
+	valueChan := make(chan []byte)
+	errChan := make(chan error)
+
+	go func() {
+		value, err := ReadRecord(common.DefaultDataFile, offset)
+		valueChan <- value
+		errChan <- err
+	}()
+
+	if err = <- errChan; err != nil {
 		return nil, err
 	}
-	vsBuf, err  := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength, common.VsByteLength)
-	if err != nil {
-		return nil, err
-	}
-	flagBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength, common.FlagByteLength)
-	if err != nil {
-		return nil, err
-	}
-	ks, err := utils.ByteSliceToInt32(ksBuf)
-	if err != nil {
-		return nil, err
-	}
-	keyBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength + common.FlagByteLength, int64(ks))
-	if err != nil {
-		return nil, err
-	}
-	vs, err := utils.ByteSliceToInt32(vsBuf)
-	valueBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength + common.FlagByteLength + int64(ks), int64(vs))
-	if err != nil {
-		return nil, err
-	}
-	crcBuf, err := common.ReadFileToByte(common.DefaultDataFile, offset + common.KsByteLength + common.VsByteLength + common.FlagByteLength + int64(ks) + int64(vs), common.CrcByteLength)
-	getCrc, err := utils.ByteSliceToUint(crcBuf)
-	crcSlice := utils.AppendByteSlice(ksBuf, vsBuf, flagBuf, keyBuf, valueBuf)
-	crcCheck := utils.CreateCrc32(crcSlice)
-	if crcCheck != getCrc {												// 如果 crc 检验不成功
-		return nil, common.ErrDataHasBeenModified
-	}
-	return valueBuf, nil
+	value := <- valueChan
+	return value, nil
 }
 
-func (conn *Connection) Delete(key string) (bool, error)  {				// 删除数据
+func (conn *Connection) Delete(key string) (bool, error)  {				 // 删除数据
 	return false,  nil
 }
 
@@ -139,8 +114,42 @@ func WriteRecord (dataFile string, offset int64, record * DataRecord) (int64, er
 	return curOffset, nil
 }
 
-func ReadRecord(filePath string )  {
-
+func ReadRecord(filePath string, offset int64) ([]byte, error) {
+	kvsBuf, err := common.ReadFileToByte(filePath, offset, common.KvsByteLength)
+	if err != nil {
+		return nil, err
+	}
+	ksBuf := kvsBuf[0:common.KsByteLength:common.KsByteLength]
+	vsBuf := kvsBuf[common.KsByteLength:len(kvsBuf):common.VsByteLength]
+	ks, err := utils.ByteSliceToInt32(ksBuf)
+	if err != nil {
+		return nil, err
+	}
+	vs, err := utils.ByteSliceToInt32(vsBuf)
+	if err != nil {
+		return nil, err
+	}
+	fkvLength := common.FlagByteLength + int64(ks) + int64(vs)
+	recordWithoutKvsBuf, err := common.ReadFileToByte(filePath, offset + common.KvsByteLength, fkvLength + common.CrcByteLength)
+	if err != nil {
+		return nil, err
+	}
+	flagKeyValBuf := recordWithoutKvsBuf[0:fkvLength]
+	valueBuf := recordWithoutKvsBuf[fkvLength + int64(ks) - 1:fkvLength]
+	crc32Buf := recordWithoutKvsBuf[fkvLength:]
+	recordWithoutCrc32Buf := utils.AppendByteSlice(kvsBuf, flagKeyValBuf)
+	recordCrc32, err := utils.ByteSliceToUint(crc32Buf)
+	if err != nil {
+		return nil, err
+	}
+	checkCrc32 := utils.CreateCrc32(recordWithoutCrc32Buf)
+	if err != nil {
+		return nil, err
+	}
+	if recordCrc32 != checkCrc32 {
+		return nil, common.ErrDataHasBeenModified
+	}
+	return valueBuf, nil
 }
 
 func (conn *Connection) Close() error {									// 关闭连接, 使 Connection 实现 io.Closer

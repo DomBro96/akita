@@ -3,88 +3,24 @@ package db
 import (
 	"akita/common"
 	"akita/utils"
-	"sync/atomic"
+	"os"
+	"sync"
 )
 
-type AkitaDb struct {
+// 数据文件对应结构体
+type AkitaDB struct {
+	mutex 		sync.Mutex			// 互斥锁
+	dataFile    *os.File			// 数据文件
+	size        int					// 记录文件大小
 }
 
 
-// 所有的数据库操作，都需要获取 Connection
-type Connection struct {
-}
 
-
-
-func (db *AkitaDb) Reload() (bool, error) {							   			//数据重新载入
+func (db *AkitaDB) Reload() (bool, error) { 											// 数据重新载入
 	return false, nil
 }
 
-func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//插入数据
-	keyBuf  := utils.StringToByteSlice(key)
-	bufLen, err := common.GetFileSize(fileName)
-	if err != nil {
-		return false, err
-	}
-	valueBuf, err := common.ReadFileToByte(fileName, 0, bufLen)
-	if err != nil {
-		return false, err
-	}
-	ks := len(keyBuf)
-	vs := len(valueBuf)
-	if ks > common.K {
-		return false, common.ErrKeySize
-	}
-	if vs > 10 * common.M {
-		return false, common.ErrFileSize
-	}
-	header := &DataHeader{Ks: int32(ks), Vs: int32(vs), Flag: 1}
-	dataRecord := &DataRecord{dateHeader: header, key: keyBuf, value: valueBuf}
-	akMap  := SingletonAkitaMap()
-	offset := akMap.CurOffset
-	offsetChan := make(chan int64)
-	errorChan  := make(chan error)
 
-	go func(filePath string, from int64, record *DataRecord) {
-		curOffset, err := WriteRecord(filePath, from, record)
-		offsetChan <- curOffset
-		errorChan  <- err
-	}(common.DefaultDataFile, offset, dataRecord)
-
-	if err = <-errorChan; err != nil {
-		return false, err
-	}
-
-	akMap.set(key)													 	     // 设置 map 索引
-	atomic.CompareAndSwapInt64(&akMap.CurOffset, offset, <-offsetChan)		 // 设置当前 offset
-	return true, nil
-}
-
-func (conn *Connection) Seek(key string) ([]byte, error) {				 // 查找数据
-	akMap := SingletonAkitaMap()
-	offset, err := akMap.get(key)										 // 获取该记录的起始 offset
-	if err != nil {
-		return nil, err
-	}
-	valueChan := make(chan []byte)
-	errChan := make(chan error)
-
-	go func() {
-		value, err := ReadRecord(common.DefaultDataFile, offset)
-		valueChan <- value
-		errChan <- err
-	}()
-
-	if err = <- errChan; err != nil {
-		return nil, err
-	}
-	value := <- valueChan
-	return value, nil
-}
-
-func (conn *Connection) Delete(key string) (bool, error)  {				 // 删除数据
-	return false,  nil
-}
 
 // 向数据文件中写入一条记录
 func WriteRecord (dataFile string, offset int64, record * DataRecord) (int64, error) {	// 将记录写入

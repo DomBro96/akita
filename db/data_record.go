@@ -8,7 +8,7 @@ type (
 		Flag int32  // type of write to file
 	}
 
-	// 表示写入数据库文件的数据结构
+	// 写入数据库文件的数据结构
 	DataRecord struct {
 		dateHeader *DataHeader
 		key   []byte

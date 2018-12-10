@@ -1,16 +1,20 @@
 package db
 
-import "akita/common"
+import (
+	"akita/common"
+	"sync"
+)
 
 type akitaMap struct {
 	Map       map[string]int64
 	CurOffset int64
+	AkMutex   sync.RWMutex				// 读写锁
 }
 
 var mapInstance *akitaMap
 
-// 全局只有一个 akitaMap 的实例
-func SingletonAkitaMap() *akitaMap {
+// 全局只有一个 akitaMap 的实例, 并且不向外部的包暴露
+func getSingletonAkitaMap() *akitaMap {
 	if mapInstance == nil {
 		mapInstance = &akitaMap{Map: map[string]int64{}, CurOffset: 0,}
 	}
@@ -30,6 +34,12 @@ func (cm *akitaMap) get(key string) (int64, error)  { // 在索引中查找
 	return value, nil
 }
 
-func (cm *akitaMap) del(key string) (bool, error) {
-	return false, nil
+func (cm *akitaMap) del(key string) (bool, int64, error) {	 // 在索引中删除, 返回删除是否成功以及 value
+
+	value, exists :=  cm.Map[key]
+	if exists {
+		delete(cm.Map, key)
+		return true, value, nil
+	}
+	return false, -1, common.ErrNoSuchRecord
 }

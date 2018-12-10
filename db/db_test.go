@@ -7,10 +7,10 @@ import (
 )
 
 func TestSingletonCoreMap(t *testing.T) {
-	akMap := SingletonAkitaMap()
+	akMap := getSingletonAkitaMap()
 	akMap.Map["dombro"]   = 12
 	akMap.Map["dombro96"] = 21
-	akMap0 := SingletonAkitaMap()
+	akMap0 := getSingletonAkitaMap()
 	for key, value := range akMap0.Map {
 		fmt.Printf("Key: %s Value: %d\n", key, value)
 	}
@@ -34,7 +34,7 @@ func TestDataRecord_WriteRecord(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(SingletonAkitaMap().CurOffset)
+	fmt.Println(getSingletonAkitaMap().CurOffset)
 	size, err := common.WriteFileWithByte("/Users/dombro/go/src/akita/file_test/akita_copy.jpg", 0, value)
 	if err != nil {
 		fmt.Println(err)

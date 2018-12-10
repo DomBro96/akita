@@ -32,12 +32,10 @@ func WriteFileWithByte(filePath string, offset int64, buff []byte) (int64, error
 	target, err :=  os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	defer target.Close()
 	if err != nil {
-		fmt.Printf("open file error: %s\n", err)
 		return 0, err
 	}
 	cOffset, err := target.WriteAt(buff, offset)
 	if err != nil {
-		fmt.Printf("write file error； %s\n", err)
 		return 0, err
 	}
 	return int64(cOffset), nil

@@ -3,27 +3,33 @@ package db
 import (
 	"akita/common"
 	"akita/utils"
-	"os"
 	"sync"
 )
 
 // 数据文件对应结构体
 type AkitaDB struct {
 	mutex 		sync.Mutex			// 互斥锁
-	dataFile    *os.File			// 数据文件
-	size        int					// 记录文件大小
+	dataFile    string			    // 数据文件
+	size        int64				// 记录文件大小
 }
 
+var dbInstance *AkitaDB
 
+// 全局单例的 AkitaDB
+func getSingletonAkitaDb() *AkitaDB{
+	if dbInstance == nil {
+		dbInstance = &AkitaDB{dataFile: common.DefaultDataFile, size: 0}
+	}
+	return dbInstance
+}
 
 func (db *AkitaDB) Reload() (bool, error) { 											// 数据重新载入
 	return false, nil
 }
 
 
-
 // 向数据文件中写入一条记录
-func WriteRecord (dataFile string, offset int64, record * DataRecord) (int64, error) {	// 将记录写入
+func (db *AkitaDB)WriteRecord (offset int64, record * DataRecord) (int64, error) {	// 将记录写入
 	ksBuf, err := utils.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
 		return 0, err
@@ -43,15 +49,18 @@ func WriteRecord (dataFile string, offset int64, record * DataRecord) (int64, er
 		return 0, err
 	}
 	recordBuf = append(recordBuf, crcBuf...)
-	curOffset, err := common.WriteFileWithByte(dataFile, offset, recordBuf)
+	db.mutex.Lock()																		// 互斥锁上锁
+	curOffset, err := common.WriteFileWithByte(db.dataFile, offset, recordBuf)
 	if err != nil {
 		return 0, err
 	}
+	db.size = curOffset
+	defer db.mutex.Unlock()																// 解锁
 	return curOffset, nil
 }
 
-func ReadRecord(filePath string, offset int64) ([]byte, error) {
-	kvsBuf, err := common.ReadFileToByte(filePath, offset, common.KvsByteLength)
+func (db *AkitaDB)ReadRecord(offset int64) ([]byte, error) {
+	kvsBuf, err := common.ReadFileToByte(db.dataFile, offset, common.KvsByteLength)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +75,7 @@ func ReadRecord(filePath string, offset int64) ([]byte, error) {
 		return nil, err
 	}
 	fkvLength := common.FlagByteLength + int64(ks) + int64(vs)
-	recordWithoutKvsBuf, err := common.ReadFileToByte(filePath, offset + common.KvsByteLength, fkvLength + common.CrcByteLength)
+	recordWithoutKvsBuf, err := common.ReadFileToByte(db.dataFile, offset + common.KvsByteLength, fkvLength + common.CrcByteLength)
 	if err != nil {
 		return nil, err
 	}

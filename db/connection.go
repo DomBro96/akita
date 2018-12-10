@@ -32,13 +32,12 @@ func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//�
 	header := &DataHeader{Ks: int32(ks), Vs: int32(vs), Flag: 1}
 	dataRecord := &DataRecord{dateHeader: header, key: keyBuf, value: valueBuf}
 	akMap  := getSingletonAkitaMap()
-	akMap.AkMutex.RLock()
-	offset := akMap.CurOffset										    // 加读锁
-	akMap.AkMutex.RUnlock()												// 解读锁
+	offset := akMap.CurOffset
 	offsetChan := make(chan int64)
 	errorChan  := make(chan error)
 	go func(filePath string, from int64, record *DataRecord) {
-		curOffset, err := WriteRecord(filePath, from, record)
+		akDb := getSingletonAkitaDb()
+		curOffset, err := akDb.WriteRecord(from, record)
 		offsetChan <- curOffset
 		errorChan  <- err
 	}(common.DefaultDataFile, offset, dataRecord)
@@ -46,9 +45,7 @@ func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//�
 	if err = <-errorChan; err != nil {
 		return false, err
 	}
-	akMap.AkMutex.Lock()
 	akMap.set(key)													 	     // 设置 map 索引
-	akMap.AkMutex.Unlock()
 	atomic.CompareAndSwapInt64(&akMap.CurOffset, offset, <-offsetChan)		 // 设置当前 offset
 	return true, nil
 }
@@ -60,10 +57,11 @@ func (conn *Connection) Seek(key string) ([]byte, error) {					 // 查找数据
 		return nil, err
 	}
 	valueChan := make(chan []byte)
-	errChan := make(chan error)
+	errChan   := make(chan error)
 
 	go func() {
-		value, err := ReadRecord(common.DefaultDataFile, offset)
+		akDb := getSingletonAkitaDb()
+		value, err := akDb.ReadRecord(offset)
 		valueChan <- value
 		errChan <- err
 	}()

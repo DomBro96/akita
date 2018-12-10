@@ -34,11 +34,11 @@ func WriteFileWithByte(filePath string, offset int64, buff []byte) (int64, error
 	if err != nil {
 		return 0, err
 	}
-	cOffset, err := target.WriteAt(buff, offset)
+	length, err := target.WriteAt(buff, offset)
 	if err != nil {
 		return 0, err
 	}
-	return int64(cOffset), nil
+	return int64(length), nil
 }
 
 

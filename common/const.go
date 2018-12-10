@@ -5,12 +5,13 @@ import "errors"
 const (
 	K               = 1024
 	M               = 1024 * 1024
-	KsByteLength	= 4
+	WriteFlag       = 1
+	DeleteFlag      = 2
+	KsByteLength    = 4
 	VsByteLength    = 4
 	FlagByteLength  = 4
 	CrcByteLength   = 4
-	KvsByteLength	= KsByteLength + VsByteLength
-	KvsfByteLength	= KsByteLength + VsByteLength + FlagByteLength
+	KvsByteLength   = KsByteLength + VsByteLength
 	DefaultDataFile = "/tmp/akdb/test.dat"
 )
 

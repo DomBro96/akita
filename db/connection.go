@@ -29,30 +29,37 @@ func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//�
 	if vs > 10 * common.M {
 		return false, common.ErrFileSize
 	}
-	header := &DataHeader{Ks: int32(ks), Vs: int32(vs), Flag: 1}
-	dataRecord := &DataRecord{dateHeader: header, key: keyBuf, value: valueBuf}
-	akMap  := getSingletonAkitaMap()
-	offset := akMap.CurOffset
-	offsetChan := make(chan int64)
+	dataRecord := &DataRecord{
+		dateHeader: &DataHeader{
+			Ks: int32(ks),
+			Vs: int32(vs),
+			Flag: common.WriteFlag,
+		    },
+		key: keyBuf,
+		value: valueBuf,
+	}
+	akDb := getSingletonAkitaDb()
+	offset := akDb.size
 	errorChan  := make(chan error)
-	go func(filePath string, from int64, record *DataRecord) {
-		akDb := getSingletonAkitaDb()
-		curOffset, err := akDb.WriteRecord(from, record)
-		offsetChan <- curOffset
-		errorChan  <- err
-	}(common.DefaultDataFile, offset, dataRecord)
+	lengthChan := make(chan int64)
+	go func(record *DataRecord) {
+		length, err := akDb.WriteRecord(record)
+		errorChan  <-err
+		lengthChan <-length
+	}(dataRecord)
 
 	if err = <-errorChan; err != nil {
 		return false, err
 	}
-	akMap.set(key)													 	     // 设置 map 索引
-	atomic.CompareAndSwapInt64(&akMap.CurOffset, offset, <-offsetChan)		 // 设置当前 offset
+	akMap  := getSingletonAkitaMap()
+	ir := &indexRecord{offset:offset, size: <-lengthChan}
+	akMap.set(key, ir)												 	     // 设置 map 索引
 	return true, nil
 }
 
 func (conn *Connection) Seek(key string) ([]byte, error) {					 // 查找数据
 	akMap := getSingletonAkitaMap()
-	offset, err := akMap.get(key)										 	// 获取该记录的起始 offset
+	offset, err := akMap.get(key)										 	 // 获取该记录的起始 offset
 	if err != nil {
 		return nil, err
 	}

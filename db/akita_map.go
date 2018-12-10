@@ -6,16 +6,16 @@ import (
 )
 
 type (
+
 		indexRecord struct {
-			offset 		int64   // 记录的位置索引
-			key         []byte
-			size        int32
+			offset 		int64   				// 记录的起始位置
+			size        int64					// 该条记录的长度
 		}
 
 		akitaMap struct {
-			Map       map[string]int64
+			Map       map[string]*indexRecord
 			CurOffset int64
-			AkMutex   sync.RWMutex // 读写锁
+			AkMutex   sync.RWMutex 				// 读写锁
 		}
 )
 
@@ -25,29 +25,29 @@ var mapInstance *akitaMap
 // 全局只有一个 akitaMap 的实例, 并且不向外部的包暴露
 func getSingletonAkitaMap() *akitaMap {
 	if mapInstance == nil {
-		mapInstance = &akitaMap{Map: map[string]int64{}, CurOffset: 0,}
+		mapInstance = &akitaMap{Map: map[string]*indexRecord{}, CurOffset: 0,}
 	}
 	return mapInstance
 }
 
-func (cm *akitaMap) set(key string) error { 				// 将记录放入索引
+func (cm *akitaMap) set(key string, ir *indexRecord) error { 		// 将记录放入索引
 	cm.AkMutex.Lock()
-	cm.Map[key] = cm.CurOffset
+	cm.Map[key] = ir
 	defer cm.AkMutex.Unlock()
 	return nil
 }
 
-func (cm *akitaMap) get(key string) (int64, error)  { 		// 在索引中查找
+func (cm *akitaMap) get(key string) (*indexRecord, error)  { 		// 在索引中查找
 	cm.AkMutex.RLock()
 	value, exists := cm.Map[key]
 	if !exists {
-		return -1, common.ErrNoSuchRecord
+		return nil, common.ErrNoSuchRecord
 	}
 	defer cm.AkMutex.RUnlock()
 	return value, nil
 }
 
-func (cm *akitaMap) del(key string) (bool, int64, error) {	 // 在索引中删除, 返回删除是否成功以及 value
+func (cm *akitaMap) del(key string) (bool, *indexRecord, error) {	 // 在索引中删除, 返回删除是否成功以及 value
 	cm.AkMutex.Lock()
 	value, exists :=  cm.Map[key]
 	if exists {
@@ -55,5 +55,5 @@ func (cm *akitaMap) del(key string) (bool, int64, error) {	 // 在索引中删�
 		return true, value, nil
 	}
 	defer cm.AkMutex.Unlock()
-	return false, -1, common.ErrNoSuchRecord
+	return false, nil, common.ErrNoSuchRecord
 }

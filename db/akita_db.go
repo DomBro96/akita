@@ -10,7 +10,7 @@ import (
 type AkitaDB struct {
 	mutex 		sync.Mutex			// 互斥锁
 	dataFile    string			    // 数据文件
-	size        int64				// 记录文件大小
+	size        int64				// 记录文件大小/同时也可以当做文件下次索引位置
 }
 
 var dbInstance *AkitaDB
@@ -29,7 +29,7 @@ func (db *AkitaDB) Reload() (bool, error) { 											// 数据重新载入
 
 
 // 向数据文件中写入一条记录
-func (db *AkitaDB)WriteRecord (offset int64, record * DataRecord) (int64, error) {	// 将记录写入
+func (db *AkitaDB)WriteRecord (record * DataRecord) (int64, error) {	// 将记录写入
 	ksBuf, err := utils.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
 		return 0, err
@@ -50,13 +50,13 @@ func (db *AkitaDB)WriteRecord (offset int64, record * DataRecord) (int64, error)
 	}
 	recordBuf = append(recordBuf, crcBuf...)
 	db.mutex.Lock()																		// 互斥锁上锁
-	curOffset, err := common.WriteFileWithByte(db.dataFile, offset, recordBuf)
+	recordLength, err := common.WriteFileWithByte(db.dataFile, db.size, recordBuf)
 	if err != nil {
 		return 0, err
 	}
-	db.size = curOffset
+	db.size += recordLength
 	defer db.mutex.Unlock()																// 解锁
-	return curOffset, nil
+	return recordLength, nil
 }
 
 func (db *AkitaDB)ReadRecord(offset int64) ([]byte, error) {

@@ -1,6 +1,8 @@
 package common
 
-import "errors"
+import (
+	"errors"
+)
 
 const (
 	K               = 1024

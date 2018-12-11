@@ -6,38 +6,40 @@ import (
 )
 
 // 数据文件对应结构体
-type AkitaDB struct {
-	mutex 		sync.Mutex			// 互斥锁
-	dataFile    string			    // 数据文件
-	size        int64				// 记录文件大小/同时也可以当做文件下次索引位置
+type DB struct {
+	lock     sync.Mutex  // 互斥锁
+	dataFile string      // 数据文件
+	size     int64       // 记录文件大小/同时也可以当做文件下次索引位置
+	iTable   *indexTable // 数据索引
 }
 
 var (
-	dbInstance      *AkitaDB
-	dbInstanceMutex sync.Mutex
+	dbInstance      *DB
+	instanceLock sync.Mutex
 	)
 
 
 
-// 全局单例的 AkitaDB
-func getSingletonAkitaDb() *AkitaDB{
+func OpenDB() *DB {
 	if dbInstance == nil {
-		dbInstanceMutex.Lock()
-		{
-			dbInstance = &AkitaDB{dataFile: common.DefaultDataFile, size: 0}
+		instanceLock.Lock()
+		dbInstance = &DB{
+			dataFile: common.DefaultDataFile,
+			size: 0,
+			iTable: newIndexTable(),
 		}
-		dbInstanceMutex.Unlock()
+		instanceLock.Unlock()
 	}
 	return dbInstance
 }
 
-func (db *AkitaDB) Reload() (bool, error) { 											// 数据重新载入
+func (db *DB) Reload() (bool, error) { // 数据重新载入
 	return false, nil
 }
 
 
 // 向数据文件中写入一条记录
-func (db *AkitaDB)WriteRecord (record *DataRecord) (int64, error) {						// 将记录写入
+func (db *DB)WriteRecord (record *DataRecord) (int64, error) { // 将记录写入
 	ksBuf, err := common.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
 		return 0, err
@@ -57,17 +59,17 @@ func (db *AkitaDB)WriteRecord (record *DataRecord) (int64, error) {						// 将�
 		return 0, err
 	}
 	recordBuf = append(recordBuf, crcBuf...)
-	db.mutex.Lock()																		// 互斥锁上锁
+	db.lock.Lock() 												// 互斥锁上锁
 	recordLength, err := common.WriteFileWithByte(db.dataFile, db.size, recordBuf)
 	if err != nil {
 		return 0, err
 	}
 	db.size += recordLength
-	defer db.mutex.Unlock()																// 解锁
+	defer db.lock.Unlock() 										// 解锁
 	return recordLength, nil
 }
 
-func (db *AkitaDB)ReadRecord(offset int64, length int64) ([]byte, error) {
+func (db *DB)ReadRecord(offset int64, length int64) ([]byte, error) {
 	recordBuf, err := common.ReadFileToByte(db.dataFile, offset, length)
 	if err != nil {
 		return nil, err
@@ -94,7 +96,7 @@ func (db *AkitaDB)ReadRecord(offset int64, length int64) ([]byte, error) {
 	return valueBuf, nil
 }
 
-func (conn *Connection) Close() error {									// 关闭连接, 使 Connection 实现 io.Closer
+func (conn *Server) Close() error { // 关闭连接, 使 Server 实现 io.Closer
 	return nil
 }
 

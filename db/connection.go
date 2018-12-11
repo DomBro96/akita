@@ -2,7 +2,6 @@ package db
 
 import (
 	"akita/common"
-	"akita/utils"
 	"sync/atomic"
 )
 
@@ -11,8 +10,8 @@ type Connection struct {
 
 }
 
-func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//插入数据
-	keyBuf := utils.StringToByteSlice(key)
+func (conn *Connection) Insert(key string, fileName string) (bool, error) {		// 插入数据
+	keyBuf := common.StringToByteSlice(key)
 	bufLen, err := common.GetFileSize(fileName)
 	if err != nil {
 		return false, err
@@ -59,7 +58,7 @@ func (conn *Connection) Insert(key string, fileName string) (bool, error) {		//�
 
 func (conn *Connection) Seek(key string) ([]byte, error) {					 // 查找数据
 	akMap := getSingletonAkitaMap()
-	offset, err := akMap.get(key)										 	 // 获取该记录的起始 offset
+	ir, err := akMap.get(key)										 	     // 获取该记录的起始 offset
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +67,7 @@ func (conn *Connection) Seek(key string) ([]byte, error) {					 // 查找数据
 
 	go func() {
 		akDb := getSingletonAkitaDb()
-		value, err := akDb.ReadRecord(offset)
+		value, err := akDb.ReadRecord(ir.offset, ir.size)
 		valueChan <- value
 		errChan <- err
 	}()
@@ -81,31 +80,33 @@ func (conn *Connection) Seek(key string) ([]byte, error) {					 // 查找数据
 }
 
 func (conn *Connection) Delete(key string) (bool, []byte, error)  {				 				// 删除数据, 返回删除的 []byte
-	/**
-		TODO:
-		1. 删除 akitaMap 中记录
-		2. 在数据文件中新增一条记录， flag 记录为 2， value size 为 0
-		3. 更新当前 offset
-	 */
+
 	akMap := getSingletonAkitaMap()
-	ok, delOffset, err := akMap.del(key)
+	ok, ir, err := akMap.del(key)
 	if !ok {
 		return false, nil, err
 	}
-	keyBuf := utils.StringToByteSlice(key)
+	keyBuf := common.StringToByteSlice(key)
 	ks := len(keyBuf)
-	vs := 0
-	header := &DataHeader{Ks: int32(ks), Vs: int32(vs), Flag: 2}
-	dataRecord := &DataRecord{dateHeader: header, key: keyBuf, value: nil}
+	dataRecord := &DataRecord{
+		dateHeader: &DataHeader{
+			Ks: int32(ks),
+			Vs: int32(0),
+			Flag: common.DeleteFlag,
+	        },
+		key: keyBuf,
+		value: nil,
+	}
 	offset := akMap.CurOffset
-	errChan   := make(chan error, 2)
+	errChan    := make(chan error, 2)
 	offsetChan := make(chan int64)
 	valueChan  := make(chan []byte)
+	akDb := getSingletonAkitaDb()
 	// 读取数据
 	go func() {
-		value, err := ReadRecord(common.DefaultDataFile, delOffset)
+		value, err := akDb.ReadRecord(ir.offset, ir.size)
 		valueChan <- value
-		errChan <- err
+		errChan   <- err
 	}()
 
 	if err = <- errChan; err != nil {
@@ -114,9 +115,9 @@ func (conn *Connection) Delete(key string) (bool, []byte, error)  {				 				// �
 	value := <- valueChan
 
 	go func(filePath string, from int64, record *DataRecord) {
-		curOffset, err := WriteRecord(filePath, from, record)
+		curOffset, err := akDb.WriteRecord(record)
 		offsetChan <- curOffset
-		errChan  <- err
+		errChan    <- err
 	}(common.DefaultDataFile, offset, dataRecord)
 
 	if err = <- errChan; err != nil {

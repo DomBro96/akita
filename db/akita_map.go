@@ -6,7 +6,6 @@ import (
 )
 
 type (
-
 		indexRecord struct {
 			offset 		int64   				// 记录的起始位置
 			size        int64					// 该条记录的长度
@@ -19,13 +18,20 @@ type (
 		}
 )
 
+var (
+	mapInstance      *akitaMap
+	mapInstanceMutex sync.Mutex				   // akitaMap 实例化时的锁
+)
 
-var mapInstance *akitaMap
 
 // 全局只有一个 akitaMap 的实例, 并且不向外部的包暴露
 func getSingletonAkitaMap() *akitaMap {
 	if mapInstance == nil {
-		mapInstance = &akitaMap{Map: map[string]*indexRecord{}, CurOffset: 0,}
+		mapInstanceMutex.Lock()
+		{
+			mapInstance = &akitaMap{Map: map[string]*indexRecord{}, CurOffset: 0,}
+		}
+		mapInstanceMutex.Unlock()
 	}
 	return mapInstance
 }

@@ -2,7 +2,6 @@ package db
 
 import (
 	"akita/common"
-	"akita/utils"
 	"sync"
 )
 
@@ -13,12 +12,21 @@ type AkitaDB struct {
 	size        int64				// 记录文件大小/同时也可以当做文件下次索引位置
 }
 
-var dbInstance *AkitaDB
+var (
+	dbInstance      *AkitaDB
+	dbInstanceMutex sync.Mutex
+	)
+
+
 
 // 全局单例的 AkitaDB
 func getSingletonAkitaDb() *AkitaDB{
 	if dbInstance == nil {
-		dbInstance = &AkitaDB{dataFile: common.DefaultDataFile, size: 0}
+		dbInstanceMutex.Lock()
+		{
+			dbInstance = &AkitaDB{dataFile: common.DefaultDataFile, size: 0}
+		}
+		dbInstanceMutex.Unlock()
 	}
 	return dbInstance
 }
@@ -29,22 +37,22 @@ func (db *AkitaDB) Reload() (bool, error) { 											// 数据重新载入
 
 
 // 向数据文件中写入一条记录
-func (db *AkitaDB)WriteRecord (record * DataRecord) (int64, error) {	// 将记录写入
-	ksBuf, err := utils.Int32ToByteSlice(record.dateHeader.Ks)
+func (db *AkitaDB)WriteRecord (record *DataRecord) (int64, error) {						// 将记录写入
+	ksBuf, err := common.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
 		return 0, err
 	}
-	vsBuf, err := utils.Int32ToByteSlice(record.dateHeader.Vs)
+	vsBuf, err := common.Int32ToByteSlice(record.dateHeader.Vs)
 	if err != nil {
 		return 0, err
 	}
-	flagBuf, err := utils.Int32ToByteSlice(record.dateHeader.Flag)
+	flagBuf, err := common.Int32ToByteSlice(record.dateHeader.Flag)
 	if err != nil {
 		return 0, err
 	}
-	recordBuf := utils.AppendByteSlice(ksBuf, vsBuf, flagBuf, record.key, record.value)
-	crc32 := utils.CreateCrc32(recordBuf)
-	crcBuf, err := utils.UintToByteSlice(crc32)
+	recordBuf := common.AppendByteSlice(ksBuf, vsBuf, flagBuf, record.key, record.value)
+	crc32 := common.CreateCrc32(recordBuf)
+	crcBuf, err := common.UintToByteSlice(crc32)
 	if err != nil {
 		return 0, err
 	}
@@ -59,39 +67,28 @@ func (db *AkitaDB)WriteRecord (record * DataRecord) (int64, error) {	// 将记�
 	return recordLength, nil
 }
 
-func (db *AkitaDB)ReadRecord(offset int64) ([]byte, error) {
-	kvsBuf, err := common.ReadFileToByte(db.dataFile, offset, common.KvsByteLength)
+func (db *AkitaDB)ReadRecord(offset int64, length int64) ([]byte, error) {
+	recordBuf, err := common.ReadFileToByte(db.dataFile, offset, length)
 	if err != nil {
 		return nil, err
 	}
-	ksBuf := kvsBuf[0:common.KsByteLength:common.KsByteLength]
-	vsBuf := kvsBuf[common.KsByteLength:len(kvsBuf):common.VsByteLength]
-	ks, err := utils.ByteSliceToInt32(ksBuf)
+	ksBuf := recordBuf[0:common.KsByteLength:common.KsByteLength]
+	ks, err := common.ByteSliceToInt32(ksBuf)
 	if err != nil {
 		return nil, err
 	}
-	vs, err := utils.ByteSliceToInt32(vsBuf)
 	if err != nil {
 		return nil, err
 	}
-	fkvLength := common.FlagByteLength + int64(ks) + int64(vs)
-	recordWithoutKvsBuf, err := common.ReadFileToByte(db.dataFile, offset + common.KvsByteLength, fkvLength + common.CrcByteLength)
+	valueBuf     := recordBuf[(common.KvsByteLength + common.FlagByteLength + int64(ks) - 1):(length - common.CrcByteLength)]
+	crcSrcBuf    := recordBuf[0:(length - common.CrcByteLength)]
+	recordCrcBuf := recordBuf[(length - common.CrcByteLength - 1):length]
+	checkCrc32, err := common.ByteSliceToUint(recordCrcBuf)
 	if err != nil {
 		return nil, err
 	}
-	flagKeyValBuf := recordWithoutKvsBuf[0:fkvLength]
-	valueBuf := recordWithoutKvsBuf[fkvLength + int64(ks) - 1:fkvLength]
-	crc32Buf := recordWithoutKvsBuf[fkvLength:]
-	recordWithoutCrc32Buf := utils.AppendByteSlice(kvsBuf, flagKeyValBuf)
-	recordCrc32, err := utils.ByteSliceToUint(crc32Buf)
-	if err != nil {
-		return nil, err
-	}
-	checkCrc32 := utils.CreateCrc32(recordWithoutCrc32Buf)
-	if err != nil {
-		return nil, err
-	}
-	if recordCrc32 != checkCrc32 {
+	crc32 := common.CreateCrc32(crcSrcBuf)
+	if crc32 != checkCrc32 {
 		return nil, common.ErrDataHasBeenModified
 	}
 	return valueBuf, nil

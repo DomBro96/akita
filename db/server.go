@@ -8,7 +8,7 @@ import (
 type Server struct {
 	master  string				// 主库 ip
 	slaves  []string			// 从库 ip
-	db  	*DB					// DB 属性
+	db  	*DB					// DB
 	echo	*echo.Echo			// echo Server 连接
 }
 

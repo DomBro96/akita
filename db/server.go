@@ -30,8 +30,8 @@ func (server *Server) Insert(key string, fileName string) (bool, error) { // 插
 	if vs > 10*common.M {
 		return false, common.ErrFileSize
 	}
-	dataRecord := &DataRecord{
-		dateHeader: &DataHeader{
+	dr := &dataRecord{
+		dateHeader: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(vs),
 			Flag: common.WriteFlag,
@@ -43,11 +43,11 @@ func (server *Server) Insert(key string, fileName string) (bool, error) { // 插
 	offset := db.size
 	errorChan := make(chan error)
 	lengthChan := make(chan int64)
-	go func(record *DataRecord) {
+	go func(record *dataRecord) {
 		length, err := db.WriteRecord(record)
 		errorChan <- err
 		lengthChan <- length
-	}(dataRecord)
+	}(dr)
 
 	if err = <-errorChan; err != nil {
 		return false, err
@@ -88,8 +88,8 @@ func (server *Server) Delete(key string) (bool, int64, error) { // 删除数据,
 	}
 	keyBuf := common.StringToByteSlice(key)
 	ks := len(keyBuf)
-	dataRecord := &DataRecord{
-		dateHeader: &DataHeader{
+	dr := &dataRecord{
+		dateHeader: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(0),
 			Flag: common.DeleteFlag,
@@ -98,10 +98,10 @@ func (server *Server) Delete(key string) (bool, int64, error) { // 删除数据,
 		value: nil,
 	}
 	errChan := make(chan error)
-	go func(filePath string, from int64, record *DataRecord) {
+	go func(filePath string, from int64, record *dataRecord) {
 		_, err := db.WriteRecord(record)
 		errChan <- err
-	}(common.DefaultDataFile, db.size, dataRecord)
+	}(common.DefaultDataFile, db.size, dr)
 
 	if err := <-errChan; err != nil {
 		return false, 0, err

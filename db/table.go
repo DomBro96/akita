@@ -22,25 +22,10 @@ const (
 	recordIndexSize = int(unsafe.Sizeof(recordIndex{}))
 )
 
-var (
-	mapInstance      *indexTable
-	mapInstanceMutex sync.Mutex // indexTable 实例化时的锁
-)
-
 func newIndexTable() *indexTable {
 	return &indexTable{
 		table: make(map[string]*recordIndex, 1024),
 	}
-}
-
-// 全局只有一个 indexTable 的实例, 并且不向外部的包暴露
-func getSingletonAkitaMap() *indexTable {
-	if mapInstance == nil {
-		mapInstanceMutex.Lock()
-		mapInstance = &indexTable{table: map[string]*recordIndex{}}
-		mapInstanceMutex.Unlock()
-	}
-	return mapInstance
 }
 
 func (it *indexTable) put(key string, newIndex *recordIndex) (oldIndex *recordIndex) { // 将记录放入索引表

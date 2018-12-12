@@ -36,7 +36,7 @@ func (db *DB) Reload() (bool, error) { // 数据重新载入
 }
 
 // 向数据文件中写入一条记录
-func (db *DB) WriteRecord(record *DataRecord) (int64, error) { // 将记录写入
+func (db *DB) WriteRecord(record *dataRecord) (int64, error) { // 将记录写入
 	ksBuf, err := common.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
 		return 0, err

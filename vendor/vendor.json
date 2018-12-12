@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "NRH7X+Nbt2VmGAlolU/ghGehTPo=",
+			"path": "github.com/labstack/echo",
+			"revision": "3f8b45c8d0dd840198a6b24b3393e5ec553dcb85",
+			"revisionTime": "2018-12-05T16:13:48Z"
+		}
+	],
+	"rootPath": "akita"
+}

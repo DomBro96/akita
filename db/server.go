@@ -6,13 +6,13 @@ import (
 )
 
 type Server struct {
-	master  string				// 主库 ip
-	slaves  []string			// 从库 ip
-	db  	*DB					// DB 属性
-	echo	*echo.Echo			// echo Server 连接
+	master string     // 主库 ip
+	slaves []string   // 从库 ip
+	db     *DB        // DB 属性
+	echo   *echo.Echo // echo Server 连接
 }
 
-func (server *Server) Insert(key string, fileName string) (bool, error) { 		// 插入数据
+func (server *Server) Insert(key string, fileName string) (bool, error) { // 插入数据
 	keyBuf := common.StringToByteSlice(key)
 	bufLen, err := common.GetFileSize(fileName)
 	if err != nil {
@@ -27,26 +27,26 @@ func (server *Server) Insert(key string, fileName string) (bool, error) { 		// �
 	if ks > common.K {
 		return false, common.ErrKeySize
 	}
-	if vs > 10 * common.M {
+	if vs > 10*common.M {
 		return false, common.ErrFileSize
 	}
 	dataRecord := &DataRecord{
 		dateHeader: &DataHeader{
-			Ks: int32(ks),
-			Vs: int32(vs),
+			Ks:   int32(ks),
+			Vs:   int32(vs),
 			Flag: common.WriteFlag,
-		    },
-		key: keyBuf,
+		},
+		key:   keyBuf,
 		value: valueBuf,
 	}
 	db := server.db
 	offset := db.size
-	errorChan  := make(chan error)
+	errorChan := make(chan error)
 	lengthChan := make(chan int64)
 	go func(record *DataRecord) {
 		length, err := db.WriteRecord(record)
-		errorChan  <-err
-		lengthChan <-length
+		errorChan <- err
+		lengthChan <- length
 	}(dataRecord)
 
 	if err = <-errorChan; err != nil {
@@ -54,32 +54,32 @@ func (server *Server) Insert(key string, fileName string) (bool, error) { 		// �
 	}
 	it := db.iTable
 	ri := &recordIndex{offset: offset, size: int(<-lengthChan)}
-	it.put(key, ri) 														  // 设置 map 索引
+	it.put(key, ri) // 设置 map 索引
 	return true, nil
 }
 
 func (server *Server) Seek(key string) ([]byte, error) {
 	db := server.db
 	it := server.db.iTable
-	ri := it.get(key)										 	     		 // 获取该记录的起始 offset
+	ri := it.get(key) // 获取该记录的起始 offset
 	if ri == nil {
 		return nil, nil
 	}
 	valueChan := make(chan []byte)
-	errChan   := make(chan error)
+	errChan := make(chan error)
 	go func() {
 		value, err := db.ReadRecord(ri.offset, int64(ri.size))
 		valueChan <- value
-		errChan   <- err
+		errChan <- err
 	}()
-	if err := <- errChan; err != nil {
+	if err := <-errChan; err != nil {
 		return nil, err
 	}
-	value := <- valueChan
+	value := <-valueChan
 	return value, nil
 }
 
-func (server *Server) Delete(key string) (bool, int64, error)  { 		     // 删除数据, 返回删除数据的 offset
+func (server *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返回删除数据的 offset
 	db := server.db
 	it := db.iTable
 	ri := it.remove(key)
@@ -90,20 +90,20 @@ func (server *Server) Delete(key string) (bool, int64, error)  { 		     // 删�
 	ks := len(keyBuf)
 	dataRecord := &DataRecord{
 		dateHeader: &DataHeader{
-			Ks: int32(ks),
-			Vs: int32(0),
+			Ks:   int32(ks),
+			Vs:   int32(0),
 			Flag: common.DeleteFlag,
-	        },
-		key: keyBuf,
+		},
+		key:   keyBuf,
 		value: nil,
 	}
-	errChan    := make(chan error)
+	errChan := make(chan error)
 	go func(filePath string, from int64, record *DataRecord) {
 		_, err := db.WriteRecord(record)
-		errChan    <- err
+		errChan <- err
 	}(common.DefaultDataFile, db.size, dataRecord)
 
-	if err := <- errChan; err != nil {
+	if err := <-errChan; err != nil {
 		return false, 0, err
 	}
 	return true, ri.offset, nil

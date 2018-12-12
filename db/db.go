@@ -14,19 +14,17 @@ type DB struct {
 }
 
 var (
-	dbInstance      *DB
+	dbInstance   *DB
 	instanceLock sync.Mutex
-	)
-
-
+)
 
 func OpenDB() *DB {
 	if dbInstance == nil {
 		instanceLock.Lock()
 		dbInstance = &DB{
 			dataFile: common.DefaultDataFile,
-			size: 0,
-			iTable: newIndexTable(),
+			size:     0,
+			iTable:   newIndexTable(),
 		}
 		instanceLock.Unlock()
 	}
@@ -37,9 +35,8 @@ func (db *DB) Reload() (bool, error) { // 数据重新载入
 	return false, nil
 }
 
-
 // 向数据文件中写入一条记录
-func (db *DB)WriteRecord (record *DataRecord) (int64, error) { // 将记录写入
+func (db *DB) WriteRecord(record *DataRecord) (int64, error) { // 将记录写入
 	ksBuf, err := common.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
 		return 0, err
@@ -59,17 +56,17 @@ func (db *DB)WriteRecord (record *DataRecord) (int64, error) { // 将记录写�
 		return 0, err
 	}
 	recordBuf = append(recordBuf, crcBuf...)
-	db.lock.Lock() 												// 互斥锁上锁
+	db.lock.Lock() // 互斥锁上锁
 	recordLength, err := common.WriteFileWithByte(db.dataFile, db.size, recordBuf)
 	if err != nil {
 		return 0, err
 	}
 	db.size += recordLength
-	defer db.lock.Unlock() 										// 解锁
+	defer db.lock.Unlock() // 解锁
 	return recordLength, nil
 }
 
-func (db *DB)ReadRecord(offset int64, length int64) ([]byte, error) {
+func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	recordBuf, err := common.ReadFileToByte(db.dataFile, offset, length)
 	if err != nil {
 		return nil, err
@@ -82,8 +79,8 @@ func (db *DB)ReadRecord(offset int64, length int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	valueBuf     := recordBuf[(common.KvsByteLength + common.FlagByteLength + int64(ks) - 1):(length - common.CrcByteLength)]
-	crcSrcBuf    := recordBuf[0:(length - common.CrcByteLength)]
+	valueBuf := recordBuf[(common.KvsByteLength + common.FlagByteLength + int64(ks) - 1):(length - common.CrcByteLength)]
+	crcSrcBuf := recordBuf[0:(length - common.CrcByteLength)]
 	recordCrcBuf := recordBuf[(length - common.CrcByteLength - 1):length]
 	checkCrc32, err := common.ByteSliceToUint(recordCrcBuf)
 	if err != nil {
@@ -99,6 +96,3 @@ func (db *DB)ReadRecord(offset int64, length int64) ([]byte, error) {
 func (conn *Server) Close() error { // 关闭连接, 使 Server 实现 io.Closer
 	return nil
 }
-
-
-

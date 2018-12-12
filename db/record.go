@@ -11,9 +11,7 @@ type (
 	// 写入数据库文件的数据结构
 	DataRecord struct {
 		dateHeader *DataHeader
-		key   []byte
-		value []byte
+		key        []byte
+		value      []byte
 	}
 )
-
-

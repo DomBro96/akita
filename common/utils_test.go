@@ -27,7 +27,7 @@ func TestIntToByteSlice(t *testing.T) {
 
 func TestStringToByteSlice(t *testing.T) {
 	s := "hello Wold ！"
-	bufByte:= StringToByteSlice(s)
+	bufByte := StringToByteSlice(s)
 	fmt.Println(bufByte, len(bufByte))
 	fmt.Println(len(bufByte))
 	s1 := ByteSliceToString(bufByte)

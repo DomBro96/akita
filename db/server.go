@@ -3,16 +3,21 @@ package db
 import (
 	"akita/common"
 	"github.com/labstack/echo"
+	"net/http"
 )
 
 type Server struct {
 	master string     // 主库 ip
 	slaves []string   // 从库 ip
-	db     *DB        // DB 属性
+	dB     *DB        // DB 属性
 	echo   *echo.Echo // echo Server 连接
 }
 
-func (server *Server) Insert(key string, fileName string) (bool, error) { // 插入数据
+var (
+	server *Server
+)
+
+func (s *Server) Insert(key string, fileName string) (bool, error) {
 	keyBuf := common.StringToByteSlice(key)
 	bufLen, err := common.GetFileSize(fileName)
 	if err != nil {
@@ -39,7 +44,7 @@ func (server *Server) Insert(key string, fileName string) (bool, error) { // 插
 		key:   keyBuf,
 		value: valueBuf,
 	}
-	db := server.db
+	db := s.dB
 	offset := db.size
 	errorChan := make(chan error)
 	lengthChan := make(chan int64)
@@ -58,9 +63,9 @@ func (server *Server) Insert(key string, fileName string) (bool, error) { // 插
 	return true, nil
 }
 
-func (server *Server) Seek(key string) ([]byte, error) {
-	db := server.db
-	it := server.db.iTable
+func (s *Server) Seek(key string) ([]byte, error) {
+	db := s.dB
+	it := s.dB.iTable
 	ri := it.get(key) // 获取该记录的起始 offset
 	if ri == nil {
 		return nil, nil
@@ -79,8 +84,8 @@ func (server *Server) Seek(key string) ([]byte, error) {
 	return value, nil
 }
 
-func (server *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返回删除数据的 offset
-	db := server.db
+func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返回删除数据的 offset
+	db := s.dB
 	it := db.iTable
 	ri := it.remove(key)
 	if ri == nil {
@@ -107,4 +112,66 @@ func (server *Server) Delete(key string) (bool, int64, error) { // 删除数据,
 		return false, 0, err
 	}
 	return true, ri.offset, nil
+}
+
+func save(ctx echo.Context) error {
+	key := ctx.FormValue("key")
+	if key == "" {
+		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
+	}
+	file, err := ctx.FormFile("file")
+
+	if file == nil {
+		return ctx.JSON(http.StatusOK, "file can not be empty! ")
+	}
+
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, "file upload fail. ")
+	}
+	if file.Size > 10*common.M {
+		return ctx.JSON(http.StatusOK, common.ErrFileSize)
+	}
+	_, err = server.Insert(key, file.Filename)
+	if err != nil {
+		return ctx.JSON(http.StatusOK, err)
+	}
+	return ctx.JSON(http.StatusOK, "save success! ")
+}
+
+func search(ctx echo.Context) error  {
+	key := ctx.QueryParam("key")
+	if key == "" {
+		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
+	}
+	value, err := server.Seek(key)
+	if err != nil {
+		return ctx.JSON(http.StatusOK, err)
+	}
+	return ctx.JSON(http.StatusOK, value)
+}
+
+func delete(ctx echo.Context) error  {
+	key := ctx.QueryParam("key")
+	if key == "" {
+		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
+	}
+	_, delOffset, err := server.Delete(key)
+	if err != nil {
+		return ctx.JSON(http.StatusOK, err)
+	}
+	return ctx.JSON(http.StatusOK, delOffset)
+}
+
+
+
+
+func init() {
+	server = &Server{
+		echo: echo.New(),
+		dB: OpenDB(),
+	}
+	server.echo.POST("/akita/save", save)
+	server.echo.GET("/akita/search", search)
+	server.echo.GET("/akita/delete", delete)
+	server.echo.Start(":8989")
 }

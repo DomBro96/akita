@@ -14,9 +14,9 @@ type DB struct {
 }
 
 
-func OpenDB() *DB {
+func OpenDB(path string) *DB {
 	db := &DB{
-		dataFile: common.DefaultDataFile,
+		dataFile: path,
 		size:     0,
 		iTable:   newIndexTable(),
 	}

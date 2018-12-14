@@ -4,6 +4,8 @@ import (
 	"akita/common"
 	"github.com/labstack/echo"
 	"net/http"
+	"os"
+	"strings"
 )
 
 type Server struct {
@@ -15,6 +17,7 @@ type Server struct {
 
 var (
 	Sev *Server
+	port string
 )
 
 func (s *Server) Insert(key string, fileName string) (bool, error) {
@@ -163,15 +166,27 @@ func del(ctx echo.Context) error  {
 }
 
 func (s *Server) Start() error{
-	return s.echo.Start(":8989")
+	return s.echo.Start(port)
 }
 
 
 func init() {
+	c := new(common.Config)
+	file, _ := os.Getwd()
+	initFile := file + string(os.PathSeparator) + "conf" + string(os.PathSeparator) + "akita.ini"
+	c.InitConfig(initFile)
+	slave := c.ConfMap["server.slaves"]
+	slave = strings.TrimSpace(slave)
+	slave = strings.Replace(slave, "{", "", 1)
+	slave = strings.Replace(slave, "}", "", 1)
+	slaves := strings.Split(slave, ",")
 	Sev = &Server{
+		master: c.ConfMap["server.master"],
+		slaves: slaves,
 		echo: echo.New(),
-		dB: OpenDB(),
+		dB: OpenDB(c.ConfMap["db.datafile"]),
 	}
+	port = c.ConfMap["server.port"]
 	Sev.echo.POST("/akita/save", save)
 	Sev.echo.GET("/akita/search", search)
 	Sev.echo.GET("/akita/del", del)

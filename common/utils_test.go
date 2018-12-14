@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -68,5 +69,14 @@ func TestConfig_InitConfig(t *testing.T) {
 	fmt.Println(c.Read("server.host"))
 	fmt.Println(c.Read("server.port"))
 	fmt.Println()
+}
+
+func TestConfig_Read(t *testing.T) {
+	s := "{115.21.32.31,112.23.45.67,12.56.79.46}"
+	s = strings.TrimSpace(s)
+	fmt.Println(s)
+	s = strings.Replace(s, "{", "", 1)
+	s = strings.Replace(s, "}", "", 1)
+	fmt.Println(s)
 
 }

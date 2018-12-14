@@ -14,7 +14,7 @@ type Server struct {
 }
 
 var (
-	server *Server
+	Sev *Server
 )
 
 func (s *Server) Insert(key string, fileName string) (bool, error) {
@@ -131,7 +131,7 @@ func save(ctx echo.Context) error {
 	if file.Size > 10*common.M {
 		return ctx.JSON(http.StatusOK, common.ErrFileSize)
 	}
-	_, err = server.Insert(key, file.Filename)
+	_, err = Sev.Insert(key, file.Filename)
 	if err != nil {
 		return ctx.JSON(http.StatusOK, err)
 	}
@@ -143,35 +143,37 @@ func search(ctx echo.Context) error  {
 	if key == "" {
 		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
 	}
-	value, err := server.Seek(key)
+	value, err := Sev.Seek(key)
 	if err != nil {
 		return ctx.JSON(http.StatusOK, err)
 	}
 	return ctx.JSON(http.StatusOK, value)
 }
 
-func delete(ctx echo.Context) error  {
+func del(ctx echo.Context) error  {
 	key := ctx.QueryParam("key")
 	if key == "" {
 		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
 	}
-	_, delOffset, err := server.Delete(key)
+	_, delOffset, err := Sev.Delete(key)
 	if err != nil {
 		return ctx.JSON(http.StatusOK, err)
 	}
 	return ctx.JSON(http.StatusOK, delOffset)
 }
 
-
+func (s *Server) Start() error{
+	return s.echo.Start(":8989")
+}
 
 
 func init() {
-	server = &Server{
+	Sev = &Server{
 		echo: echo.New(),
 		dB: OpenDB(),
 	}
-	server.echo.POST("/akita/save", save)
-	server.echo.GET("/akita/search", search)
-	server.echo.GET("/akita/delete", delete)
-	server.echo.Start(":8989")
+	Sev.echo.POST("/akita/save", save)
+	Sev.echo.GET("/akita/search", search)
+	Sev.echo.GET("/akita/del", del)
+
 }

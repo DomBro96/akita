@@ -13,22 +13,14 @@ type DB struct {
 	iTable   *indexTable // 数据索引
 }
 
-var (
-	dbInstance   *DB
-	instanceLock sync.Mutex
-)
 
 func OpenDB() *DB {
-	if dbInstance == nil {
-		instanceLock.Lock()
-		dbInstance = &DB{
-			dataFile: common.DefaultDataFile,
-			size:     0,
-			iTable:   newIndexTable(),
-		}
-		instanceLock.Unlock()
+	db := &DB{
+		dataFile: common.DefaultDataFile,
+		size:     0,
+		iTable:   newIndexTable(),
 	}
-	return dbInstance
+	return db
 }
 
 func (db *DB) Reload() (bool, error) { // 数据重新载入
@@ -93,6 +85,6 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	return valueBuf, nil
 }
 
-func (conn *Server) Close() error { // 关闭连接, 使 Server 实现 io.Closer
+func (s *Server) Close() error { // 关闭连接, 使 Server 实现 io.Closer
 	return nil
 }

@@ -175,5 +175,4 @@ func init() {
 	Sev.echo.POST("/akita/save", save)
 	Sev.echo.GET("/akita/search", search)
 	Sev.echo.GET("/akita/del", del)
-
 }

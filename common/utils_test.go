@@ -59,3 +59,14 @@ func TestAppendByteSlice(t *testing.T) {
 	bs3 := AppendByteSlice(bs0, bs1, bs2)
 	fmt.Println(bs3)
 }
+func TestConfig_InitConfig(t *testing.T) {
+	c := new(Config)
+	err := c.InitConfig("/Users/dombro/go/src/akita/file_test/akita.ini")
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(c.Read("server.host"))
+	fmt.Println(c.Read("server.port"))
+	fmt.Println()
+
+}

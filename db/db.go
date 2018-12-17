@@ -83,11 +83,11 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	recordCrcBuf := recordBuf[(length - common.CrcByteLength):length]
 	checkCrc32, err := common.ByteSliceToUint(recordCrcBuf)
 	if err != nil {
-		fmt.Println(1111)
-		fmt.Println(err)
 		return nil, err
 	}
 	crc32 := common.CreateCrc32(crcSrcBuf)
+	fmt.Println(checkCrc32)
+	fmt.Println(crc32)
 	if crc32 != checkCrc32 {
 		return nil, common.ErrDataHasBeenModified
 	}

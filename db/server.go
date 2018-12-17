@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 )
 
 type Server struct {
@@ -57,6 +58,8 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 }
 
 func (s *Server) Seek(key string) ([]byte, error) {
+	var wg sync.WaitGroup
+	wg.Add(1)
 	db := s.dB
 	it := s.dB.iTable
 	ri := it.get(key) // 获取该记录的起始 offset
@@ -68,21 +71,24 @@ func (s *Server) Seek(key string) ([]byte, error) {
 	valueChan := make(chan []byte)
 	errChan := make(chan error)
 	go func(bc chan []byte, ec chan error) {
+		defer wg.Done()
 		value, err := db.ReadRecord(ri.offset, int64(ri.size))
 		bc <- value
 		ec <- err
+		return
 	}(valueChan, errChan)
-	if err := <-errChan; err != nil {
+	value := <-valueChan
+	err := <-errChan
+	wg.Wait()
+	if err != nil {
 		return nil, err
 	}
-	value, ok := <-valueChan
-	fmt.Println(ok)
-	close(valueChan)
-	close(errChan)
 	return value, nil
 }
 
 func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返回删除数据的 offset
+	var wg sync.WaitGroup
+	wg.Add(1)
 	db := s.dB
 	it := db.iTable
 	ri := it.remove(key)
@@ -102,11 +108,14 @@ func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返�
 	}
 	errChan := make(chan error)
 	go func(filePath string, from int64, record *dataRecord) {
+		defer wg.Done()
 		_, err := db.WriteRecord(record)
 		errChan <- err
+		return
 	}(common.DefaultDataFile, db.size, dr)
-
-	if err := <-errChan; err != nil {
+	wg.Wait()
+	err := <-errChan
+	if err != nil {
 		return false, 0, err
 	}
 	return true, ri.offset, nil
@@ -135,13 +144,11 @@ func save(ctx echo.Context) error {
 	src, err := file.Open()
 	defer src.Close()
 	if err != nil {
-		fmt.Println(1, err)
 		return ctx.JSON(http.StatusOK, err)
 	}
 
 	_, err = Sev.Insert(key, src, length)
 	if err != nil {
-		fmt.Println(4, err)
 		return ctx.JSON(http.StatusOK, err)
 	}
 	return ctx.JSON(http.StatusOK, "save success! ")

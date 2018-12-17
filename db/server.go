@@ -4,6 +4,7 @@ import (
 	"akita/common"
 	"fmt"
 	"github.com/labstack/echo"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
@@ -22,24 +23,11 @@ var (
 	host string
 )
 
-func (s *Server) Insert(key string, fileName string) (bool, error) {
+func (s *Server) Insert(key string, src multipart.File, length int64) (bool, error) {
 	keyBuf := common.StringToByteSlice(key)
-	bufLen, err := common.GetFileSize(fileName)
-	if err != nil {
-		return false, err
-	}
-	valueBuf, err := common.ReadFileToByte(fileName, 0, bufLen)
-	if err != nil {
-		return false, err
-	}
+	valueBuf := make([]byte, length)
 	ks := len(keyBuf)
 	vs := len(valueBuf)
-	if ks > common.K {
-		return false, common.ErrKeySize
-	}
-	if vs > 10*common.M {
-		return false, common.ErrFileSize
-	}
 	dr := &dataRecord{
 		dateHeader: &dataHeader{
 			Ks:   int32(ks),
@@ -59,7 +47,7 @@ func (s *Server) Insert(key string, fileName string) (bool, error) {
 		lengthChan <- length
 	}(dr)
 
-	if err = <-errorChan; err != nil {
+	if err := <-errorChan; err != nil {
 		return false, err
 	}
 	it := db.iTable
@@ -75,17 +63,22 @@ func (s *Server) Seek(key string) ([]byte, error) {
 	if ri == nil {
 		return nil, nil
 	}
+	fmt.Println(ri.offset)
+	fmt.Println(ri.size)
 	valueChan := make(chan []byte)
 	errChan := make(chan error)
-	go func() {
+	go func(bc chan []byte, ec chan error) {
 		value, err := db.ReadRecord(ri.offset, int64(ri.size))
-		valueChan <- value
-		errChan <- err
-	}()
+		bc <- value
+		ec <- err
+	}(valueChan, errChan)
 	if err := <-errChan; err != nil {
 		return nil, err
 	}
-	value := <-valueChan
+	value, ok := <-valueChan
+	fmt.Println(ok)
+	close(valueChan)
+	close(errChan)
 	return value, nil
 }
 
@@ -122,22 +115,33 @@ func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返�
 func save(ctx echo.Context) error {
 	key := ctx.FormValue("key")
 	if key == "" {
-		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
+		return ctx.JSON(http.StatusOK, "key can not be empty! ")
+	}
+	if len(common.StringToByteSlice(key)) > 10*common.K {
+		return ctx.JSON(http.StatusOK, common.ErrKeySize)
 	}
 	file, err := ctx.FormFile("file")
-
 	if file == nil {
 		return ctx.JSON(http.StatusOK, "file can not be empty! ")
 	}
-
 	if err != nil {
+		fmt.Println(err)
 		return ctx.JSON(http.StatusOK, "file upload fail. ")
 	}
-	if file.Size > 10*common.M {
+	var length int64
+	if length = file.Size ; length > 10*common.M {
 		return ctx.JSON(http.StatusOK, common.ErrFileSize)
 	}
-	_, err = Sev.Insert(key, file.Filename)
+	src, err := file.Open()
+	defer src.Close()
 	if err != nil {
+		fmt.Println(1, err)
+		return ctx.JSON(http.StatusOK, err)
+	}
+
+	_, err = Sev.Insert(key, src, length)
+	if err != nil {
+		fmt.Println(4, err)
 		return ctx.JSON(http.StatusOK, err)
 	}
 	return ctx.JSON(http.StatusOK, "save success! ")
@@ -150,6 +154,7 @@ func search(ctx echo.Context) error  {
 	}
 	value, err := Sev.Seek(key)
 	if err != nil {
+		fmt.Println(err)
 		return ctx.JSON(http.StatusOK, err)
 	}
 	return ctx.JSON(http.StatusOK, value)

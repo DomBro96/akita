@@ -2,6 +2,7 @@ package db
 
 import (
 	"akita/common"
+	"fmt"
 	"github.com/labstack/echo"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ type Server struct {
 var (
 	Sev *Server
 	port string
+	host string
 )
 
 func (s *Server) Insert(key string, fileName string) (bool, error) {
@@ -129,7 +131,7 @@ func save(ctx echo.Context) error {
 	}
 
 	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, "file upload fail. ")
+		return ctx.JSON(http.StatusOK, "file upload fail. ")
 	}
 	if file.Size > 10*common.M {
 		return ctx.JSON(http.StatusOK, common.ErrFileSize)
@@ -166,7 +168,11 @@ func del(ctx echo.Context) error  {
 }
 
 func (s *Server) Start() error{
-	return s.echo.Start(port)
+	err := s.echo.Start(host  + ":" + port)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return err
 }
 
 
@@ -187,6 +193,8 @@ func init() {
 		dB: OpenDB(c.ConfMap["db.datafile"]),
 	}
 	port = c.ConfMap["server.port"]
+	host = c.ConfMap["server.host"]
+	Sev.echo.HideBanner = true
 	Sev.echo.POST("/akita/save", save)
 	Sev.echo.GET("/akita/search", search)
 	Sev.echo.GET("/akita/del", del)

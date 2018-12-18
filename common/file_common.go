@@ -15,8 +15,7 @@ func ReadFileToByte(src *os.File, offset int64, length int64) ([]byte, error) {
 	return buff, nil
 }
 
-
-func WriteBufToFile(dst *os.File, offset int64, buff []byte)  (int64, error)  {
+func WriteBufToFile(dst *os.File, offset int64, buff []byte) (int64, error) {
 	length, err := dst.WriteAt(buff, offset)
 	if err != nil {
 		return 0, err
@@ -24,14 +23,14 @@ func WriteBufToFile(dst *os.File, offset int64, buff []byte)  (int64, error)  {
 	return int64(length), nil
 }
 
-func GetFileSize(src *os.File) (int64, error)  {
+func GetFileSize(src *os.File) (int64, error) {
 	bufLen, err := src.Seek(0, 2)
 	defer src.Close()
 	defer src.Seek(0, 0)
 	return bufLen, err
 }
 
-func FileIsExit(path string) (bool, error)  {
+func FileIsExit(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil

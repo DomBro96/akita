@@ -18,7 +18,7 @@ type Server struct {
 }
 
 var (
-	Sev *Server
+	Sev  *Server
 	port string
 	host string
 )
@@ -47,7 +47,7 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 	}(dr)
 
 	if err := <-errorChan; err != nil {
-		common.Error.Printf("Insert key: " + key +" failed:  %s \n", err)
+		common.Error.Printf("Insert key: "+key+" failed:  %s \n", err)
 		return false, err
 	}
 	it := db.iTable
@@ -78,7 +78,7 @@ func (s *Server) Seek(key string) ([]byte, error) {
 	err := <-errChan
 	wg.Wait()
 	if err != nil {
-		common.Error.Printf("Seek key: " + key +" failed:  %s \n", err)
+		common.Error.Printf("Seek key: "+key+" failed:  %s \n", err)
 		return nil, err
 	}
 	return value, nil
@@ -114,7 +114,7 @@ func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返�
 	wg.Wait()
 	err := <-errChan
 	if err != nil {
-		common.Error.Printf("Delete key: " + key +" failed: %s \n", err)
+		common.Error.Printf("Delete key: "+key+" failed: %s \n", err)
 		return false, 0, err
 	}
 	return true, ri.offset, nil
@@ -137,7 +137,7 @@ func save(ctx echo.Context) error {
 		return ctx.JSON(http.StatusOK, "file upload fail. Please try again. ")
 	}
 	var length int64
-	if length = file.Size ; length > 10*common.M {
+	if length = file.Size; length > 10*common.M {
 		return ctx.JSON(http.StatusOK, "file is too large to save. ")
 	}
 	src, err := file.Open()
@@ -148,44 +148,43 @@ func save(ctx echo.Context) error {
 	}
 	_, err = Sev.Insert(key, src, length)
 	if err != nil {
-		return ctx.JSON(http.StatusOK, "save key: " + key + " fail")
+		return ctx.JSON(http.StatusOK, "save key: "+key+" fail")
 	}
-	return ctx.JSON(http.StatusOK, "save  key: "+ key +" success! ")
+	return ctx.JSON(http.StatusOK, "save  key: "+key+" success! ")
 }
 
-func search(ctx echo.Context) error  {
+func search(ctx echo.Context) error {
 	key := ctx.QueryParam("key")
 	if key == "" {
 		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
 	}
 	value, err := Sev.Seek(key)
 	if err != nil {
-		return ctx.JSON(http.StatusOK, "seek key: " + key + " fail. ")
+		return ctx.JSON(http.StatusOK, "seek key: "+key+" fail. ")
 	}
 	return ctx.JSON(http.StatusOK, value)
 }
 
-func del(ctx echo.Context) error  {
+func del(ctx echo.Context) error {
 	key := ctx.QueryParam("key")
 	if key == "" {
 		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
 	}
 	_, delOffset, err := Sev.Delete(key)
 	if err != nil {
-		return ctx.JSON(http.StatusOK, "delete key: " + key + "fail. ")
+		return ctx.JSON(http.StatusOK, "delete key: "+key+"fail. ")
 	}
 	return ctx.JSON(http.StatusOK, delOffset)
 }
 
-func (s *Server) Start() error{
-	err := s.echo.Start(host  + ":" + port)
+func (s *Server) Start() error {
+	err := s.echo.Start(host + ":" + port)
 	if err != nil {
 		common.Error.Printf("Akita server start fail : %s\n", err)
 	}
 	common.Info.Printf("Akita server started. ")
 	return err
 }
-
 
 func init() {
 	c := new(common.Config)
@@ -200,8 +199,8 @@ func init() {
 	Sev = &Server{
 		master: c.ConfMap["server.master"],
 		slaves: slaves,
-		echo: echo.New(),
-		dB: OpenDB(c.ConfMap["db.datafile"]),
+		echo:   echo.New(),
+		dB:     OpenDB(c.ConfMap["db.datafile"]),
 	}
 	port = c.ConfMap["server.port"]
 	host = c.ConfMap["server.host"]

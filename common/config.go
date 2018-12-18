@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	sep  = "."
+	sep = "."
 )
 
 type Config struct {
@@ -16,7 +16,7 @@ type Config struct {
 	section string
 }
 
-func (c *Config) InitConfig(path string) error  {
+func (c *Config) InitConfig(path string) error {
 	c.ConfMap = make(map[string]string)
 	f, err := os.Open(path)
 	if err != nil {
@@ -38,8 +38,8 @@ func (c *Config) InitConfig(path string) error  {
 		}
 		n1 := strings.Index(s, "[")
 		n2 := strings.LastIndex(s, "]")
-		if n1 > -1 && n2 > -1 && n2 > n1 + 1 {
-			c.section = strings.TrimSpace(s[n1+1:n2])
+		if n1 > -1 && n2 > -1 && n2 > n1+1 {
+			c.section = strings.TrimSpace(s[n1+1 : n2])
 			continue
 		}
 
@@ -51,7 +51,7 @@ func (c *Config) InitConfig(path string) error  {
 		if len(key) == 0 {
 			continue
 		}
-		val := strings.TrimSpace(s[eqIndex + 1:])
+		val := strings.TrimSpace(s[eqIndex+1:])
 
 		valPos := strings.Index(val, "\t#")
 		if valPos > -1 {

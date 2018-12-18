@@ -15,7 +15,7 @@ func TestDB_WriteRecord(t *testing.T) {
 	ok, err := common.FileIsExit(dir)
 	if ok && err == nil {
 		fmt.Println("exit")
-	}else if !ok && err == nil {
+	} else if !ok && err == nil {
 		fmt.Println("not exit")
 	}
 

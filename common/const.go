@@ -14,12 +14,9 @@ const (
 	FlagByteLength  = 4
 	CrcByteLength   = 4
 	KvsByteLength   = KsByteLength + VsByteLength
-	DefaultDataFile = "/tmp/akdb/test.dat"
 )
 
 var (
-	ErrFileSize            = errors.New("file size is too large to save. ")
 	ErrKeySize             = errors.New("key size is too large to save. ")
-	ErrNoSuchRecord        = errors.New("no such record in database. ")
 	ErrDataHasBeenModified = errors.New("the data has been modified, not safe. ")
 )

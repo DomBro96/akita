@@ -2,7 +2,6 @@ package db
 
 import (
 	"akita/common"
-	"fmt"
 	"github.com/labstack/echo"
 	"mime/multipart"
 	"net/http"
@@ -28,11 +27,10 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 	keyBuf := common.StringToByteSlice(key)
 	valueBuf := make([]byte, length)
 	ks := len(keyBuf)
-	vs := len(valueBuf)
 	dr := &dataRecord{
 		dateHeader: &dataHeader{
 			Ks:   int32(ks),
-			Vs:   int32(vs),
+			Vs:   int32(length),
 			Flag: common.WriteFlag,
 		},
 		key:   keyBuf,
@@ -49,6 +47,7 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 	}(dr)
 
 	if err := <-errorChan; err != nil {
+		common.Error.Printf("Insert key: " + key +" failed:  %s \n", err)
 		return false, err
 	}
 	it := db.iTable
@@ -66,8 +65,6 @@ func (s *Server) Seek(key string) ([]byte, error) {
 	if ri == nil {
 		return nil, nil
 	}
-	fmt.Println(ri.offset)
-	fmt.Println(ri.size)
 	valueChan := make(chan []byte)
 	errChan := make(chan error)
 	go func(bc chan []byte, ec chan error) {
@@ -81,6 +78,7 @@ func (s *Server) Seek(key string) ([]byte, error) {
 	err := <-errChan
 	wg.Wait()
 	if err != nil {
+		common.Error.Printf("Seek key: " + key +" failed:  %s \n", err)
 		return nil, err
 	}
 	return value, nil
@@ -107,15 +105,16 @@ func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返�
 		value: nil,
 	}
 	errChan := make(chan error)
-	go func(filePath string, from int64, record *dataRecord) {
+	go func(from int64, record *dataRecord) {
 		defer wg.Done()
 		_, err := db.WriteRecord(record)
 		errChan <- err
 		return
-	}(common.DefaultDataFile, db.size, dr)
+	}(db.size, dr)
 	wg.Wait()
 	err := <-errChan
 	if err != nil {
+		common.Error.Printf("Delete key: " + key +" failed: %s \n", err)
 		return false, 0, err
 	}
 	return true, ri.offset, nil
@@ -134,24 +133,24 @@ func save(ctx echo.Context) error {
 		return ctx.JSON(http.StatusOK, "file can not be empty! ")
 	}
 	if err != nil {
-		fmt.Println(err)
-		return ctx.JSON(http.StatusOK, "file upload fail. ")
+		common.Error.Printf("Get form file fail: %s\n", err)
+		return ctx.JSON(http.StatusOK, "file upload fail. Please try again. ")
 	}
 	var length int64
 	if length = file.Size ; length > 10*common.M {
-		return ctx.JSON(http.StatusOK, common.ErrFileSize)
+		return ctx.JSON(http.StatusOK, "file is too large to save. ")
 	}
 	src, err := file.Open()
 	defer src.Close()
 	if err != nil {
+		common.Error.Printf("File open fail: %s\n", err)
 		return ctx.JSON(http.StatusOK, err)
 	}
-
 	_, err = Sev.Insert(key, src, length)
 	if err != nil {
-		return ctx.JSON(http.StatusOK, err)
+		return ctx.JSON(http.StatusOK, "save key: " + key + " fail")
 	}
-	return ctx.JSON(http.StatusOK, "save success! ")
+	return ctx.JSON(http.StatusOK, "save  key: "+ key +" success! ")
 }
 
 func search(ctx echo.Context) error  {
@@ -161,8 +160,7 @@ func search(ctx echo.Context) error  {
 	}
 	value, err := Sev.Seek(key)
 	if err != nil {
-		fmt.Println(err)
-		return ctx.JSON(http.StatusOK, err)
+		return ctx.JSON(http.StatusOK, "seek key: " + key + " fail. ")
 	}
 	return ctx.JSON(http.StatusOK, value)
 }
@@ -174,7 +172,7 @@ func del(ctx echo.Context) error  {
 	}
 	_, delOffset, err := Sev.Delete(key)
 	if err != nil {
-		return ctx.JSON(http.StatusOK, err)
+		return ctx.JSON(http.StatusOK, "delete key: " + key + "fail. ")
 	}
 	return ctx.JSON(http.StatusOK, delOffset)
 }
@@ -182,8 +180,9 @@ func del(ctx echo.Context) error  {
 func (s *Server) Start() error{
 	err := s.echo.Start(host  + ":" + port)
 	if err != nil {
-		fmt.Println(err)
+		common.Error.Printf("Akita server start fail : %s\n", err)
 	}
+	common.Info.Printf("Akita server started. ")
 	return err
 }
 

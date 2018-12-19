@@ -51,13 +51,17 @@ func OpenDB(path string) *DB {
 
 // 数据重新载入， 重建索引的过程
 func (db *DB) Reload() error {
+	// 根据文件大小判断文件是否需要重新
+	if db.size < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
+		return nil
+	}
 	var offset int64 = 0
 	dataBuff, err := common.ReadFileToByte(db.dataFile, offset, db.size)
 	if err != nil {
 		return err
 	}
-	for offset != db.size {
-		ksBuf := dataBuff[offset:common.KsByteLength]
+	for offset < db.size {
+		ksBuf := dataBuff[offset:(offset + common.KsByteLength)]
 		vsBuf := dataBuff[(offset + common.KsByteLength):(offset + common.KvsByteLength)]
 		flagBuf := dataBuff[(offset + common.KvsByteLength):(offset + common.KvsByteLength + common.FlagByteLength)]
 		ks, err := common.ByteSliceToInt32(ksBuf)

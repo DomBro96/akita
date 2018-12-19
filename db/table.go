@@ -50,6 +50,7 @@ func (it *indexTable) remove(key string) (ri *recordIndex) { // 在索引中删�
 	it.rwLock.Lock()
 	if ri = it.table[key]; ri != nil {
 		it.usage -= len(key) + recordIndexSize
+		delete(it.table, key)
 	}
 	defer it.rwLock.Unlock()
 	return

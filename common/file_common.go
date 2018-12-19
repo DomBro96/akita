@@ -25,7 +25,6 @@ func WriteBufToFile(dst *os.File, offset int64, buff []byte) (int64, error) {
 
 func GetFileSize(src *os.File) (int64, error) {
 	bufLen, err := src.Seek(0, 2)
-	defer src.Close()
 	defer src.Seek(0, 0)
 	return bufLen, err
 }

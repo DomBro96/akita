@@ -111,8 +111,8 @@ func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返�
 		errChan <- err
 		return
 	}(db.size, dr)
-	wg.Wait()
 	err := <-errChan
+	wg.Wait()
 	if err != nil {
 		common.Error.Printf("Delete key: "+key+" failed: %s \n", err)
 		return false, 0, err
@@ -201,6 +201,15 @@ func init() {
 		slaves: slaves,
 		echo:   echo.New(),
 		dB:     OpenDB(c.ConfMap["db.datafile"]),
+	}
+	errChan := make(chan error)
+	go func() {
+		err := Sev.dB.Reload()
+		errChan <- err
+	}()
+	err := <-errChan
+	if err != nil {
+		common.Error.Fatalf("Reload data base error: %s\n", err)
 	}
 	port = c.ConfMap["server.port"]
 	host = c.ConfMap["server.host"]

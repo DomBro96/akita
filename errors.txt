@@ -1,2 +1,4 @@
 ERROR: 2018/12/19 11:03:08 db.go:124: Write data to file error: write /Users/dombro/akdb/akdata.dat: file already closed
 ERROR: 2018/12/19 11:03:08 server.go:50: Insert key: akita2 failed:  write /Users/dombro/akdb/akdata.dat: file already closed 
+ERROR: 2018/12/19 14:39:34 server.go:189: Akita server start fail : http: Server closed
+ERROR: 2018/12/19 14:42:15 server.go:190: Akita server start fail : http: Server closed

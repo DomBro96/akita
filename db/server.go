@@ -177,12 +177,25 @@ func del(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, delOffset)
 }
 
+
 func (s *Server) Start() error {
 	err := s.echo.Start(host + ":" + port)
 	if err != nil {
 		common.Error.Printf("Akita server start fail : %s\n", err)
 	}
 	common.Info.Printf("Akita server started. ")
+	return err
+}
+
+// 关闭数据库服务
+func (s *Server) Close() error  {
+	// 关闭对外服务
+	err := s.echo.Close()
+	if err != nil {
+		common.Error.Printf("Server close error: %s\n", err)
+	}
+	// 关闭文件写入
+	err = s.dB.Close()
 	return err
 }
 
@@ -209,7 +222,7 @@ func init() {
 	}()
 	err := <-errChan
 	if err != nil {
-		common.Error.Fatalf("Reload data base error: %s\n", err)
+		common.Error.Fatalf("Reload data base erro: %s\n", err)
 	}
 	port = c.ConfMap["server.port"]
 	host = c.ConfMap["server.host"]

@@ -1,6 +1,8 @@
 package main
 
-import "akita/db"
+import (
+	"akita/db"
+)
 
 func main() {
 	db.Sev.Start()

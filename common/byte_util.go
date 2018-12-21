@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"hash/crc32"
+	"reflect"
+	"unsafe"
 )
 
 func ByteSliceToInt32(bufByte []byte) (int32, error) {
@@ -39,16 +41,27 @@ func ByteSliceToUint(bufByte []byte) (uint32, error) {
 	return u, err
 }
 
-func StringToByteSlice(key string) []byte {
-	var data []byte
-	data = []byte(key)
-	return data
+func StringToByteSlice(str string) (buf []byte) {
+	if str == "" {
+		return nil
+	}
+	strHeader := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
+	sliceHeader.Len = strHeader.Len
+	sliceHeader.Cap = strHeader.Len
+	sliceHeader.Data = strHeader.Data
+	return
 }
 
-func ByteSliceToString(data []byte) string {
-	var key string
-	key = string(data[:])
-	return key
+func ByteSliceToString(buf []byte) (str string) {
+	if buf == nil {
+		return ""
+	}
+	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
+	strHeader := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	strHeader.Len = sliceHeader.Len
+	strHeader.Data = sliceHeader.Data
+	return
 }
 
 func AppendByteSlice(bs ...[]byte) []byte { // 将若干切片追加到一起

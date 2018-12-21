@@ -156,3 +156,12 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	}
 	return valueBuf, nil
 }
+
+func (db *DB) Close() error  {
+	err := db.dataFile.Close()
+	if err != nil {
+		common.Error.Printf("Data file close err: %s\n", err)
+		return err
+	}
+	return nil
+}

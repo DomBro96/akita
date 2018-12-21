@@ -2,3 +2,12 @@ ERROR: 2018/12/19 11:03:08 db.go:124: Write data to file error: write /Users/dom
 ERROR: 2018/12/19 11:03:08 server.go:50: Insert key: akita2 failed:  write /Users/dombro/akdb/akdata.dat: file already closed 
 ERROR: 2018/12/19 14:39:34 server.go:189: Akita server start fail : http: Server closed
 ERROR: 2018/12/19 14:42:15 server.go:190: Akita server start fail : http: Server closed
+ERROR: 2018/12/21 15:01:50 main.go:68: Install Akita: A Simple Key-Value Database:					[[31mFAILED[0m]%!(EXTRA *errors.errorString=You must have root user privileges. Possibly using 'sudo' command should help)
+ERROR: 2018/12/21 15:02:38 main.go:68: Status could not defined%!(EXTRA *errors.errorString=Service is not installed)
+ERROR: 2018/12/21 15:15:54 main.go:71: Status could not defined%!(EXTRA *errors.errorString=Service is not installed)
+ERROR: 2018/12/21 15:32:36 main.go:71: Status could not defined%!(EXTRA *errors.errorString=Service is not installed)
+ERROR: 2018/12/21 16:12:13 db.go:36: Open data file error: open : no such file or directory
+ERROR: 2018/12/21 16:15:12 server.go:192: Akita server start fail : listen tcp 127.0.0.1:8989: bind: address already in use
+ERROR: 2018/12/21 16:15:54 main.go:72: %!(EXTRA *errors.errorString=You must have root user privileges. Possibly using 'sudo' command should help)
+ERROR: 2018/12/21 16:37:50 main.go:72: Status could not defined%!(EXTRA *errors.errorString=Service is not installed)
+ERROR: 2018/12/21 16:38:45 main.go:72: Status could not defined%!(EXTRA *errors.errorString=Service is not installed)

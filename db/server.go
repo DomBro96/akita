@@ -6,6 +6,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -197,7 +199,7 @@ func (s *Server) Close() error  {
 	// 关闭对外服务
 	err := s.echo.Close()
 	if err != nil {
-		common.Error.Printf("Server close error: %s\n", err)
+		return err
 	}
 	// 关闭文件写入
 	err = s.dB.Close()
@@ -206,9 +208,12 @@ func (s *Server) Close() error  {
 
 func init() {
 	c := new(common.Config)
-	file, _ := os.Getwd()
-	initFile := file + string(os.PathSeparator) + "conf" + string(os.PathSeparator) + "akita.ini"
-	c.InitConfig(initFile)
+	file, _ := exec.LookPath(os.Args[0])
+	dir := filepath.Dir(file)
+	absDir, _ := filepath.Abs(dir)
+	initFile := absDir + string(os.PathSeparator) + "conf" + string(os.PathSeparator) + "akita.ini"
+	abs, _ := filepath.Abs(initFile)
+	c.InitConfig(abs)
 	slave := c.ConfMap["server.slaves"]
 	slave = strings.TrimSpace(slave)
 	slave = strings.Replace(slave, "{", "", 1)

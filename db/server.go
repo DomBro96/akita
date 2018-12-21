@@ -26,6 +26,11 @@ var (
 func (s *Server) Insert(key string, src multipart.File, length int64) (bool, error) {
 	keyBuf := common.StringToByteSlice(key)
 	valueBuf := make([]byte, length)
+	_, err := src.Read(valueBuf)
+	if err != nil {
+		common.Error.Printf("Insert key: "+key+" failed:  %s \n", err)
+		return false, err
+	}
 	ks := len(keyBuf)
 	dr := &dataRecord{
 		dateHeader: &dataHeader{

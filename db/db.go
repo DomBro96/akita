@@ -135,13 +135,13 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 		common.Error.Printf("Rear data from file error: %s\n", err)
 		return nil, err
 	}
-	ksBuf := recordBuf[0:common.KsByteLength:common.KsByteLength]
+	ksBuf := recordBuf[0:common.KsByteLength]
 	ks, err := common.ByteSliceToInt32(ksBuf)
 	if err != nil {
 		common.Error.Printf("Turn byte slice to int32 error: %s\n", err)
 		return nil, err
 	}
-	valueBuf := recordBuf[(common.KvsByteLength + common.FlagByteLength + int64(ks) - 1):(length - common.CrcByteLength)]
+	valueBuf := recordBuf[(common.KvsByteLength + common.FlagByteLength + int64(ks)):(length - common.CrcByteLength)]
 	crcSrcBuf := recordBuf[0:(length - common.CrcByteLength)]
 	recordCrcBuf := recordBuf[(length - common.CrcByteLength):length]
 	checkCrc32, err := common.ByteSliceToUint(recordCrcBuf)

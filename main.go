@@ -53,6 +53,7 @@ func (service *Service) Manage() (string, error)  {
 		str := "Akita server was stopped. "
 		// 资源的回收
 		err := db.Sev.Close()
+		signal.Stop(interrup)
 		if err != nil {
 			str = "Akita server stop error: %s\n. "
 		}

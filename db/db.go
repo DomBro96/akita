@@ -8,15 +8,13 @@ import (
 	"sync"
 )
 
-// 数据文件对应结构体
 type DB struct {
-	lock     sync.Mutex  // 互斥锁
-	dataFile *os.File    // 数据文件
-	size     int64       // 记录文件大小/同时也可以当做文件下次索引位置
-	iTable   *indexTable // 数据索引
+	lock     sync.Mutex
+	dataFile *os.File    // data file
+	size     int64       // data file size / next insert offset
+	iTable   *indexTable // database index
 }
 
-// 在 OpenDB 函数中出错，直接退出程序
 func OpenDB(path string) *DB {
 	dir := filepath.Dir(path)
 	ok, err := common.FileIsExit(dir)
@@ -49,9 +47,8 @@ func OpenDB(path string) *DB {
 	return db
 }
 
-// 数据重新载入， 重建索引的过程
-func (db *DB) Reload() error {
-	// 根据文件大小判断文件是否需要重新
+
+func (db *DB) Reload() error {		// reload database index table
 	if db.size < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
 		return nil
 	}
@@ -93,8 +90,8 @@ func (db *DB) Reload() error {
 	return nil
 }
 
-// 向数据文件中写入一条记录
-func (db *DB) WriteRecord(record *dataRecord) (int64, error) {
+
+func (db *DB) WriteRecord(record *dataRecord) (int64, error) {	// write a record to data file
 	ksBuf, err := common.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
 		common.Error.Printf("Turn int32 to byte slice error: %s\n", err)
@@ -118,14 +115,14 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, error) {
 		return 0, err
 	}
 	recordBuf = append(recordBuf, crcBuf...)
-	db.lock.Lock() // 互斥锁上锁
+	db.lock.Lock()
 	recordLength, err := common.WriteBufToFile(db.dataFile, db.size, recordBuf)
 	if err != nil {
 		common.Error.Printf("Write data to file error: %s\n", err)
 		return 0, err
 	}
 	db.size += recordLength
-	defer db.lock.Unlock() // 解锁
+	defer db.lock.Unlock()
 	return recordLength, nil
 }
 

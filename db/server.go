@@ -4,7 +4,6 @@ import (
 	"akita/common"
 	"github.com/labstack/echo"
 	"mime/multipart"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,16 +12,15 @@ import (
 )
 
 type Server struct {
-	master string     // 主库 ip
-	slaves []string   // 从库 ip
-	dB     *DB        // DB 属性
-	echo   *echo.Echo // echo Server 连接
+	master string     // master ip
+	slaves []string   // slaves ip
+	dB     *DB
+	echo   *echo.Echo // echo server handle http request
 }
 
 var (
 	Sev  *Server
 	port string
-	host string
 )
 
 func (s *Server) Insert(key string, src multipart.File, length int64) (bool, error) {
@@ -59,7 +57,7 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 	}
 	it := db.iTable
 	ri := &recordIndex{offset: offset, size: int(<-lengthChan)}
-	it.put(key, ri) // 设置 map 索引
+	it.put(key, ri)
 	return true, nil
 }
 
@@ -68,7 +66,7 @@ func (s *Server) Seek(key string) ([]byte, error) {
 	wg.Add(1)
 	db := s.dB
 	it := s.dB.iTable
-	ri := it.get(key) // 获取该记录的起始 offset
+	ri := it.get(key)
 	if ri == nil {
 		return nil, nil
 	}
@@ -127,83 +125,37 @@ func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返�
 	return true, ri.offset, nil
 }
 
-func save(ctx echo.Context) error {
-	key := ctx.FormValue("key")
-	if key == "" {
-		return ctx.JSON(http.StatusOK, "key can not be empty! ")
-	}
-	if len(common.StringToByteSlice(key)) > 10*common.K {
-		return ctx.JSON(http.StatusOK, common.ErrKeySize)
-	}
-	file, err := ctx.FormFile("file")
-	if file == nil {
-		return ctx.JSON(http.StatusOK, "file can not be empty! ")
-	}
+func (s *Server) IsMaster() bool  { 	// judge server is master or not
+	intranet, err := common.GetIntranetIp()
 	if err != nil {
-		common.Error.Printf("Get form file fail: %s\n", err)
-		return ctx.JSON(http.StatusOK, "file upload fail. Please try again. ")
+		common.Error.Fatalf("Check your Web environment， make sure your machine has intranet ip.")
 	}
-	var length int64
-	if length = file.Size; length > 10*common.M {
-		return ctx.JSON(http.StatusOK, "file is too large to save. ")
+	if intranet == s.master {
+		return true
 	}
-	src, err := file.Open()
-	defer src.Close()
-	if err != nil {
-		common.Error.Printf("File open fail: %s\n", err)
-		return ctx.JSON(http.StatusOK, err)
-	}
-	_, err = Sev.Insert(key, src, length)
-	if err != nil {
-		return ctx.JSON(http.StatusOK, "save key: "+key+" fail")
-	}
-	return ctx.JSON(http.StatusOK, "save  key: "+key+" success! ")
+	return false
 }
-
-func search(ctx echo.Context) error {
-	key := ctx.QueryParam("key")
-	if key == "" {
-		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
-	}
-	value, err := Sev.Seek(key)
-	if err != nil {
-		return ctx.JSON(http.StatusOK, "seek key: "+key+" fail. ")
-	}
-	return ctx.JSON(http.StatusOK, value)
-}
-
-func del(ctx echo.Context) error {
-	key := ctx.QueryParam("key")
-	if key == "" {
-		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
-	}
-	_, delOffset, err := Sev.Delete(key)
-	if err != nil {
-		return ctx.JSON(http.StatusOK, "delete key: "+key+"fail. ")
-	}
-	return ctx.JSON(http.StatusOK, delOffset)
-}
-
 
 func (s *Server) Start() error {
-	err := s.echo.Start(host + ":" + port)
+	err := s.echo.Start(":" + port)
 	if err != nil {
-		common.Error.Printf("Akita server start fail : %s\n", err)
+		common.Error.Fatalf("Akita server start fail : %s\n", err)
 	}
 	common.Info.Printf("Akita server started. ")
 	return err
 }
 
-// 关闭数据库服务
-func (s *Server) Close() error  {
-	// 关闭对外服务
+
+func (s *Server) Close() error  {	// close server, stop provide service
 	err := s.echo.Close()
 	if err != nil {
 		return err
 	}
-	// 关闭文件写入
 	err = s.dB.Close()
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func init() {
@@ -235,7 +187,6 @@ func init() {
 		common.Error.Fatalf("Reload data base erro: %s\n", err)
 	}
 	port = c.ConfMap["server.port"]
-	host = c.ConfMap["server.host"]
 	Sev.echo.HideBanner = true
 	Sev.echo.POST("/akita/save", save)
 	Sev.echo.GET("/akita/search", search)

@@ -7,14 +7,14 @@ import (
 
 type (
 	recordIndex struct {
-		offset int64 // 记录的起始位置
-		size   int   // 该条记录的长度
+		offset int64 // record begin offset
+		size   int   // record size
 	}
 
 	indexTable struct {
 		table  map[string]*recordIndex
-		rwLock sync.RWMutex // 读写锁
-		usage  int          // 索引占内存大小
+		rwLock sync.RWMutex
+		usage  int          // memory size of database index table
 	}
 )
 
@@ -28,30 +28,30 @@ func newIndexTable() *indexTable {
 	}
 }
 
-func (it *indexTable) put(key string, newIndex *recordIndex) (oldIndex *recordIndex) { // 将记录放入索引表
+func (it *indexTable) put(key string, newIndex *recordIndex) (oldIndex *recordIndex) { // insert record to index table
 	it.rwLock.Lock()
+	defer it.rwLock.Unlock()
 	oldIndex = it.table[key]
 	it.table[key] = newIndex
-	if oldIndex == nil { // 如果索引是新插入的， 更新索引表内存大小
+	if oldIndex == nil {
 		it.usage += len(key) + recordIndexSize
 	}
-	defer it.rwLock.Unlock()
 	return
 }
 
-func (it *indexTable) get(key string) (ri *recordIndex) { // 在索引中查找
+func (it *indexTable) get(key string) (ri *recordIndex) { // find record from index table
 	it.rwLock.RLock()
-	ri = it.table[key]
 	defer it.rwLock.RUnlock()
+	ri = it.table[key]
 	return
 }
 
-func (it *indexTable) remove(key string) (ri *recordIndex) { // 在索引中删除, 返回删除是否成功以及 value
+func (it *indexTable) remove(key string) (ri *recordIndex) { // delete record from index table
 	it.rwLock.Lock()
+	defer it.rwLock.Unlock()
 	if ri = it.table[key]; ri != nil {
 		it.usage -= len(key) + recordIndexSize
 		delete(it.table, key)
 	}
-	defer it.rwLock.Unlock()
 	return
 }

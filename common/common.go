@@ -3,24 +3,25 @@ package common
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
+	"net"
 	"reflect"
+	"time"
 	"unsafe"
 )
 
 func ByteSliceToInt32(bufByte []byte) (int32, error) {
 	buf := bytes.NewBuffer(bufByte)
 	var i int32
-	//同样使用大端法读取
-	err := binary.Read(buf, binary.BigEndian, &i)
+	err := binary.Read(buf, binary.BigEndian, &i)	// use big end way read bytes to int32
 	return i, err
 }
 
 func Int32ToByteSlice(i int32) ([]byte, error) {
 	s1 := make([]byte, 0)
 	buf := bytes.NewBuffer(s1)
-	// int64 to []byte, 使用大端法
-	err := binary.Write(buf, binary.BigEndian, i)
+	err := binary.Write(buf, binary.BigEndian, i)	// use big end way write int32 to int32
 	bufByte := buf.Bytes()
 	return bufByte, err
 }
@@ -28,7 +29,7 @@ func Int32ToByteSlice(i int32) ([]byte, error) {
 func UintToByteSlice(u uint32) ([]byte, error) {
 	s1 := make([]byte, 0)
 	buf := bytes.NewBuffer(s1)
-	err := binary.Write(buf, binary.BigEndian, u)
+	err := binary.Write(buf, binary.BigEndian, u)	// use big end way write uint32 to int32
 	bufByte := buf.Bytes()
 	return bufByte, err
 }
@@ -36,8 +37,7 @@ func UintToByteSlice(u uint32) ([]byte, error) {
 func ByteSliceToUint(bufByte []byte) (uint32, error) {
 	buf := bytes.NewBuffer(bufByte)
 	var u uint32
-	//同样使用大端法读取
-	err := binary.Read(buf, binary.BigEndian, &u)
+	err := binary.Read(buf, binary.BigEndian, &u)	// use big end way read bytes to uint32
 	return u, err
 }
 
@@ -64,7 +64,7 @@ func ByteSliceToString(buf []byte) (str string) {
 	return
 }
 
-func AppendByteSlice(bs ...[]byte) []byte { // 将若干切片追加到一起
+func AppendByteSlice(bs ...[]byte) []byte {
 	buf := make([]byte, 0)
 	for _, b := range bs {
 		buf = append(buf, b...)
@@ -75,4 +75,31 @@ func AppendByteSlice(bs ...[]byte) []byte { // 将若干切片追加到一起
 func CreateCrc32(buf []byte) uint32 {
 	crcValue := crc32.ChecksumIEEE(buf)
 	return crcValue
+}
+
+func GetExternalIp() (string, error) {
+	hc := NewHttpClient(2000 * time.Millisecond)
+	data, err := hc.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	str := ByteSliceToString(data)
+	fmt.Println(str)
+	return str, nil
+}
+
+func GetIntranetIp() (string, error) {
+	adds, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+	var intranetIp string
+	for _, a := range adds {
+		if ipNet, ok := a.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+			if ipNet.IP.To4() != nil {
+				 intranetIp = ipNet.IP.String()
+			}
+		}
+	}
+	return intranetIp, nil
 }

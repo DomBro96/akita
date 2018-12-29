@@ -41,21 +41,19 @@ func (service *Service) Manage() (string, error)  {
 		 }
 	 }
 	interrup := make(chan os.Signal, 1)
-	// 接收中断信号
 	signal.Notify(interrup, os.Interrupt, os.Kill, syscall.SIGEMT)
-	// 启动 akita 监听
-	go func() {
+
+	go func() {		// start akita listening
 		db.Sev.Start()
 	}()
 	select {
-	// 接收到中断信号，中断程序
 	case <-interrup:
 		str := "Akita server was stopped. "
-		// 资源的回收
-		err := db.Sev.Close()
-		signal.Stop(interrup)
+		err := db.Sev.Close()		// recycle resources
 		if err != nil {
 			str = "Akita server stop error: %s\n. "
+		}else {
+			signal.Stop(interrup)
 		}
 		return str, err
 	}
@@ -64,7 +62,7 @@ func (service *Service) Manage() (string, error)  {
 func main() {
 	srv, err := daemon.New(name, description, dependencies...)
 	if err != nil {
-		common.Error.Fatalf("Akita Service start error: %s\n", err)
+		common.Error.Fatalf("Akita service start error: %s\n", err)
 	}
 	service := &Service{srv}
 	status, err := service.Manage()

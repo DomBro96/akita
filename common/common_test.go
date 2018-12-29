@@ -78,5 +78,16 @@ func TestConfig_Read(t *testing.T) {
 	s = strings.Replace(s, "{", "", 1)
 	s = strings.Replace(s, "}", "", 1)
 	fmt.Println(s)
+}
 
+func TestGetExternalIp(t *testing.T) {
+	GetExternalIp()
+}
+
+func TestGetIntranetIp(t *testing.T) {
+	intranet, err := GetIntranetIp()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(intranet)
 }

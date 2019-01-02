@@ -7,15 +7,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type Server struct {
-	master string     // master ip
-	slaves []string   // slaves ip
-	dB     *DB
-	echo   *echo.Echo // echo server handle http request
+	master  string     // master ip
+	slaves  []string   // slaves ip
+	dB      *DB
+	echo    *echo.Echo // echo server handle http request
+	synChan chan int64
 }
 
 var (
@@ -58,6 +62,12 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 	it := db.iTable
 	ri := &recordIndex{offset: offset, size: int(<-lengthChan)}
 	it.put(key, ri)
+
+	go func() {
+		curOffset := atomic.LoadInt64(&db.size)
+		s.synChan <- curOffset
+	}()
+
 	return true, nil
 }
 
@@ -122,7 +132,71 @@ func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返�
 		common.Error.Printf("Delete key: "+key+" failed: %s \n", err)
 		return false, 0, err
 	}
+	go func() {
+		curOffset := atomic.LoadInt64(&db.size)
+		s.synChan <- curOffset
+	}()
 	return true, ri.offset, nil
+}
+
+func (s *Server) DbSync() error{				// slaves sync func
+	hc := common.NewHttpClient(2000 * time.Millisecond)
+	size := atomic.LoadInt64(&s.dB.size)
+	offset := strconv.Itoa(int(size))
+	url := s.master + ":" + port + "/akita/syn?offset=" + offset
+	data, err :=  hc.Get(url)
+	if err != nil {
+		common.Error.Printf("Sync request fail : %s\n", err)
+		return err
+	}
+	cur := 0
+	if data != nil {
+		for cur < len(data) {
+			ksBuf := data[cur:cur+common.KsByteLength]
+			vsBuf := data[cur+common.KsByteLength:cur+common.KsByteLength+common.VsByteLength]
+			ks, err := common.ByteSliceToInt32(ksBuf)
+			if err != nil {
+				common.Error.Printf("Bytes to int err: %s\n", err)
+				return err
+			}
+			vs, err := common.ByteSliceToInt32(vsBuf)
+			if err != nil {
+				common.Error.Printf("Bytes to int err: %s\n", err)
+				return err
+			}
+			flagBuf := data[cur+common.KvsByteLength:cur+common.KvsByteLength+common.FlagByteLength]
+			flag, err := common.ByteSliceToInt32(flagBuf)
+			if err != nil {
+				common.Error.Printf("Bytes to int err: %s\n", err)
+				return err
+			}
+			keyBuf := data[cur+common.KvsByteLength+common.FlagByteLength:cur+common.KvsByteLength+common.FlagByteLength+int(ks)]
+			key := common.ByteSliceToString(keyBuf)
+			valueBuf := data[cur+common.KvsByteLength+common.FlagByteLength+int(ks):cur+common.KvsByteLength+common.FlagByteLength+int(ks)+int(vs)]
+			dr := &dataRecord{
+				dateHeader: &dataHeader{
+					Ks:   int32(ks),
+					Vs:   int32(vs),
+					Flag: flag,
+				},
+				key:   keyBuf,
+				value: valueBuf,
+			}
+			length, err := s.dB.WriteRecord(dr)
+			if err != nil {
+				common.Error.Printf("Slave write record err: %s\n", err)
+				return err
+			}
+			if flag == common.DeleteFlag {
+				s.dB.iTable.remove(key)
+			}else {
+				ri := &recordIndex{offset: size, size: int(length)}
+				s.dB.iTable.put(key, ri)
+			}
+			cur += int(length)
+		}
+	}
+	return nil
 }
 
 func (s *Server) IsMaster() bool  { 	// judge server is master or not
@@ -176,6 +250,7 @@ func init() {
 		slaves: slaves,
 		echo:   echo.New(),
 		dB:     OpenDB(c.ConfMap["db.datafile"]),
+		synChan: make(chan int64, 1),
 	}
 	errChan := make(chan error)
 	go func() {
@@ -191,4 +266,5 @@ func init() {
 	Sev.echo.POST("/akita/save", save)
 	Sev.echo.GET("/akita/search", search)
 	Sev.echo.GET("/akita/del", del)
+	Sev.echo.GET("/akita/syn", syn)
 }

@@ -4,9 +4,14 @@ import (
 	"akita/common"
 	"github.com/labstack/echo"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 func save(ctx echo.Context) error {
+	if ! Sev.IsMaster() {
+		return ctx.JSON(http.StatusBadRequest, "sorry this akita node isn't master node! ")
+	}
 	key := ctx.FormValue("key")
 	if key == "" {
 		return ctx.JSON(http.StatusOK, "key can not be empty! ")
@@ -52,6 +57,9 @@ func search(ctx echo.Context) error {
 }
 
 func del(ctx echo.Context) error {
+	if ! Sev.IsMaster() {
+		return ctx.JSON(http.StatusBadRequest, "sorry this akita node isn't master node! ")
+	}
 	key := ctx.QueryParam("key")
 	if key == "" {
 		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
@@ -61,4 +69,28 @@ func del(ctx echo.Context) error {
 		return ctx.JSON(http.StatusOK, "delete key: "+key+"fail. ")
 	}
 	return ctx.JSON(http.StatusOK, delOffset)
+}
+
+func syn(ctx echo.Context) error {
+	if ! Sev.IsMaster() {
+		return ctx.JSON(http.StatusBadRequest, nil)
+	}
+	offsetStr := ctx.QueryParam("offset")
+	offset, _ := strconv.Atoi(offsetStr)
+	timeout := time.After(1000 * time.Millisecond)
+	select {
+	case <-timeout:
+		return ctx.JSON(http.StatusOK, nil)
+	case size := <-Sev.synChan:
+		if size > int64(offset) {
+			length := size - int64(offset)
+			buf, err := common.ReadFileToByte(Sev.dB.dataFile, int64(offset), length)
+			if err != nil {
+				return ctx.JSON(http.StatusOK, nil)
+			}
+			return ctx.JSON(http.StatusOK, buf)
+ 		}else {
+ 			return ctx.JSON(http.StatusOK, nil)
+		}
+	}
 }

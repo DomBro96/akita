@@ -46,6 +46,15 @@ func (service *Service) Manage() (string, error)  {
 	go func() {		// start akita listening
 		db.Sev.Start()
 	}()
+
+	if !db.Sev.IsMaster() {
+		go func() {
+			for {
+				db.Sev.DbSync()
+			}
+		}()
+	}
+
 	select {
 	case <-interrup:
 		str := "Akita server was stopped. "

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 )
 
 type DB struct {
@@ -121,8 +122,8 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, error) {	// write a record
 		common.Error.Printf("Write data to file error: %s\n", err)
 		return 0, err
 	}
-	db.size += recordLength
 	defer db.lock.Unlock()
+	atomic.AddInt64(&db.size, recordLength)
 	return recordLength, nil
 }
 

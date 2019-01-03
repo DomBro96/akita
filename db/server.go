@@ -18,8 +18,9 @@ type Server struct {
 	master  string     // master ip
 	slaves  []string   // slaves ip
 	dB      *DB
-	echo    *echo.Echo // echo server handle http request
-	synChan chan int64
+	echo    *echo.Echo  // echo server handle http request
+	rwLock	sync.RWMutex
+	notifiers map[string]chan struct{} // notifiers notify slaves can get data from 
 }
 
 var (
@@ -62,12 +63,7 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 	it := db.iTable
 	ri := &recordIndex{offset: offset, size: int(<-lengthChan)}
 	it.put(key, ri)
-
-	go func() {
-		curOffset := atomic.LoadInt64(&db.size)
-		s.synChan <- curOffset
-	}()
-
+	s.notify()
 	return true, nil
 }
 
@@ -99,7 +95,7 @@ func (s *Server) Seek(key string) ([]byte, error) {
 	return value, nil
 }
 
-func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返回删除数据的 offset
+func (s *Server) Delete(key string) (bool, int64, error) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	db := s.dB
@@ -132,25 +128,29 @@ func (s *Server) Delete(key string) (bool, int64, error) { // 删除数据, 返�
 		common.Error.Printf("Delete key: "+key+" failed: %s \n", err)
 		return false, 0, err
 	}
-	go func() {
-		curOffset := atomic.LoadInt64(&db.size)
-		s.synChan <- curOffset
-	}()
+	s.notify()
 	return true, ri.offset, nil
 }
 
-func (s *Server) DbSync() error{				// slaves sync func
+func (s *Server) DbSync() error{				// slaves sync update data
 	hc := common.NewHttpClient(2000 * time.Millisecond)
 	size := atomic.LoadInt64(&s.dB.size)
 	offset := strconv.Itoa(int(size))
 	url := s.master + ":" + port + "/akita/syn?offset=" + offset
-	data, err :=  hc.Get(url)
+	repData, err :=  hc.Get(url)
 	if err != nil {
 		common.Error.Printf("Sync request fail : %s\n", err)
 		return err
 	}
+	dataMap, err := common.UnmarshalData(repData)
+	if err != nil {
+		common.Error.Printf("Unmarsha data to json fail: %s\n", err)
+		return err
+	}
+
 	cur := 0
-	if data != nil {
+	if dataMap["code"] != 0 {
+		data := dataMap["data"].([]byte)
 		for cur < len(data) {
 			ksBuf := data[cur:cur+common.KsByteLength]
 			vsBuf := data[cur+common.KsByteLength:cur+common.KsByteLength+common.VsByteLength]
@@ -210,6 +210,19 @@ func (s *Server) IsMaster() bool  { 	// judge server is master or not
 	return false
 }
 
+func (s *Server) notify() {
+	s.rwLock.Lock()
+	for host, notifier := range s.notifiers {
+		close(notifier)
+		delete(s.notifiers, host)
+	}
+	s.rwLock.Unlock()
+}
+func (s *Server) register(slaveHost string, notifier chan struct{}) {
+	s.rwLock.Lock()
+	s.notifiers[slaveHost] = notifier
+	s.rwLock.Unlock()
+}
 func (s *Server) Start() error {
 	err := s.echo.Start(":" + port)
 	if err != nil {
@@ -218,7 +231,6 @@ func (s *Server) Start() error {
 	common.Info.Printf("Akita server started. ")
 	return err
 }
-
 
 func (s *Server) Close() error  {	// close server, stop provide service
 	err := s.echo.Close()
@@ -250,7 +262,7 @@ func init() {
 		slaves: slaves,
 		echo:   echo.New(),
 		dB:     OpenDB(c.ConfMap["db.datafile"]),
-		synChan: make(chan int64, 1),
+		notifiers: make(map[string]chan struct{}),
 	}
 	errChan := make(chan error)
 	go func() {

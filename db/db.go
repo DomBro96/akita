@@ -155,6 +155,18 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	return valueBuf, nil
 }
 
+func (db *DB) getDataByOffset(offset int64) ([]byte, error) {
+	length := atomic.LoadInt64(&db.size) - offset
+	if length == 0 {
+		return nil, common.ErrNoDataUpdate
+	}
+	data, err := common.ReadFileToByte(db.dataFile, offset, length)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 func (db *DB) Close() error  {
 	err := db.dataFile.Close()
 	if err != nil {

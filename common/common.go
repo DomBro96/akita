@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"net"
@@ -102,4 +103,13 @@ func GetIntranetIp() (string, error) {
 		}
 	}
 	return intranetIp, nil
+}
+
+func UnmarshalData(data []byte) (map[string]interface{}, error) {
+	m := make(map[string]interface{})
+	err := json.Unmarshal(data, &m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }

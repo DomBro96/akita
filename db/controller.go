@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+type SyncData struct {
+	code int `json:"code"`
+	data []byte `json:"data"`
+}
+
 func save(ctx echo.Context) error {
 	if ! Sev.IsMaster() {
 		return ctx.JSON(http.StatusBadRequest, "sorry this akita node isn't master node! ")
@@ -71,26 +76,40 @@ func del(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, delOffset)
 }
 
-func syn(ctx echo.Context) error {
+func syn(ctx echo.Context) error {		// deal with slaves sync request
 	if ! Sev.IsMaster() {
 		return ctx.JSON(http.StatusBadRequest, nil)
 	}
 	offsetStr := ctx.QueryParam("offset")
 	offset, _ := strconv.Atoi(offsetStr)
-	timeout := time.After(1000 * time.Millisecond)
-	select {
-	case <-timeout:
-		return ctx.JSON(http.StatusOK, nil)
-	case size := <-Sev.synChan:
-		if size > int64(offset) {
-			length := size - int64(offset)
-			buf, err := common.ReadFileToByte(Sev.dB.dataFile, int64(offset), length)
-			if err != nil {
-				return ctx.JSON(http.StatusOK, nil)
+	data, err := Sev.dB.getDataByOffset(int64(offset))
+	syncData := &SyncData{
+		code: 0,
+		data: nil,
+	}
+	if err != nil {
+		if err == common.ErrNoDataUpdate {
+			notifier := make(chan struct{})
+			Sev.register(ctx.Request().Host, notifier)
+			select {
+			case <-time.After(1000 * time.Millisecond):
+				return ctx.JSON(http.StatusOK, syncData)
+			case  <-notifier:
+				data, err = Sev.dB.getDataByOffset(int64(offset))
+				if err != nil {
+					common.Error.Printf("Get data by offset error :%s\n", err)
+					return ctx.JSON(http.StatusOK, syncData)
+				}
+				syncData.code = 1
+				syncData.data = data
+				return ctx.JSON(http.StatusOK, syncData)
 			}
-			return ctx.JSON(http.StatusOK, buf)
- 		}else {
- 			return ctx.JSON(http.StatusOK, nil)
+		}else {
+			common.Error.Printf("Get data by offset error :%s\n", err)
+			return ctx.JSON(http.StatusOK, syncData)
 		}
 	}
+	syncData.code = 1
+	syncData.data = data
+	return ctx.JSON(http.StatusOK, syncData)
 }

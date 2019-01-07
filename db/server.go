@@ -153,7 +153,7 @@ func (s *Server) DbSync() error{				// slaves sync update data
 		data := dataMap["data"].([]byte)
 		for cur < len(data) {
 			ksBuf := data[cur:cur+common.KsByteLength]
-			vsBuf := data[cur+common.KsByteLength:cur+common.KsByteLength+common.VsByteLength]
+			vsBuf := data[cur+common.KsByteLength:cur+common.KvsByteLength]
 			ks, err := common.ByteSliceToInt32(ksBuf)
 			if err != nil {
 				common.Error.Printf("Bytes to int err: %s\n", err)
@@ -182,16 +182,22 @@ func (s *Server) DbSync() error{				// slaves sync update data
 				key:   keyBuf,
 				value: valueBuf,
 			}
-			length, err := s.dB.WriteRecord(dr)
-			if err != nil {
-				common.Error.Printf("Slave write record err: %s\n", err)
-				return err
-			}
+			 var length int64
 			if flag == common.DeleteFlag {
 				s.dB.iTable.remove(key)
+				length, err = s.dB.WriteRecordNoCrc32(dr)
+				if err != nil {
+					common.Error.Printf("Slave write record err: %s\n", err)
+					return err
+				}
 			}else {
 				ri := &recordIndex{offset: size, size: int(length)}
 				s.dB.iTable.put(key, ri)
+				length, err = s.dB.WriteRecord(dr)
+				if err != nil {
+					common.Error.Printf("Slave write record err: %s\n", err)
+					return err
+				}
 			}
 			cur += int(length)
 		}

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	name = "akita"
+	name        = "akita"
 	description = "Akita: A Simple Key-Value Database"
 )
 
@@ -21,29 +21,29 @@ type Service struct {
 	daemon.Daemon
 }
 
-func (service *Service) Manage() (string, error)  {
+func (service *Service) Manage() (string, error) {
 	usage := "Usage: akita install | remove | start | stop | status"
-	 if len(os.Args) > 1 {
-	 	command := os.Args[1]
-		 switch command {
-		 case "install":
-		 		return service.Install()
-		 case "remove":
-		 		return service.Remove()
-		 case "start":
-		 		return service.Start()
-		 case "stop":
-		 		return service.Stop()
-		 case "status":
-		 		return service.Status()
-		 default:
-			 	return usage, nil
-		 }
-	 }
+	if len(os.Args) > 1 {
+		command := os.Args[1]
+		switch command {
+		case "install":
+			return service.Install()
+		case "remove":
+			return service.Remove()
+		case "start":
+			return service.Start()
+		case "stop":
+			return service.Stop()
+		case "status":
+			return service.Status()
+		default:
+			return usage, nil
+		}
+	}
 	interrup := make(chan os.Signal, 1)
 	signal.Notify(interrup, os.Interrupt, os.Kill, syscall.SIGEMT)
 
-	go func() {		// start akita listening
+	go func() { // start akita listening
 		db.Sev.Start()
 	}()
 
@@ -58,10 +58,10 @@ func (service *Service) Manage() (string, error)  {
 	select {
 	case <-interrup:
 		str := "Akita server was stopped. "
-		err := db.Sev.Close()		// recycle resources
+		err := db.Sev.Close() // recycle resources
 		if err != nil {
 			str = "Akita server stop error: %s\n. "
-		}else {
+		} else {
 			signal.Stop(interrup)
 		}
 		return str, err

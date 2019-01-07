@@ -15,12 +15,12 @@ import (
 )
 
 type Server struct {
-	master  string     // master ip
-	slaves  []string   // slaves ip
-	dB      *DB
-	echo    *echo.Echo  // echo server handle http request
-	rwLock	sync.RWMutex
-	notifiers map[string]chan struct{} // notifiers notify slaves can get data from 
+	master    string   // master ip
+	slaves    []string // slaves ip
+	dB        *DB
+	echo      *echo.Echo // echo server handle http request
+	rwLock    sync.RWMutex
+	notifiers map[string]chan struct{} // notifiers notify slaves can get data from
 }
 
 var (
@@ -132,12 +132,12 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 	return true, ri.offset, nil
 }
 
-func (s *Server) DbSync() error{				// slaves sync update data
+func (s *Server) DbSync() error { // slaves sync update data
 	hc := common.NewHttpClient(2000 * time.Millisecond)
 	size := atomic.LoadInt64(&s.dB.size)
 	offset := strconv.Itoa(int(size))
 	url := s.master + ":" + port + "/akita/syn?offset=" + offset
-	repData, err :=  hc.Get(url)
+	repData, err := hc.Get(url)
 	if err != nil {
 		common.Error.Printf("Sync request fail : %s\n", err)
 		return err
@@ -152,8 +152,8 @@ func (s *Server) DbSync() error{				// slaves sync update data
 	if dataMap["code"] != 0 {
 		data := dataMap["data"].([]byte)
 		for cur < len(data) {
-			ksBuf := data[cur:cur+common.KsByteLength]
-			vsBuf := data[cur+common.KsByteLength:cur+common.KvsByteLength]
+			ksBuf := data[cur : cur+common.KsByteLength]
+			vsBuf := data[cur+common.KsByteLength : cur+common.KvsByteLength]
 			ks, err := common.ByteSliceToInt32(ksBuf)
 			if err != nil {
 				common.Error.Printf("Bytes to int err: %s\n", err)
@@ -164,15 +164,15 @@ func (s *Server) DbSync() error{				// slaves sync update data
 				common.Error.Printf("Bytes to int err: %s\n", err)
 				return err
 			}
-			flagBuf := data[cur+common.KvsByteLength:cur+common.KvsByteLength+common.FlagByteLength]
+			flagBuf := data[cur+common.KvsByteLength : cur+common.KvsByteLength+common.FlagByteLength]
 			flag, err := common.ByteSliceToInt32(flagBuf)
 			if err != nil {
 				common.Error.Printf("Bytes to int err: %s\n", err)
 				return err
 			}
-			keyBuf := data[cur+common.KvsByteLength+common.FlagByteLength:cur+common.KvsByteLength+common.FlagByteLength+int(ks)]
+			keyBuf := data[cur+common.KvsByteLength+common.FlagByteLength : cur+common.KvsByteLength+common.FlagByteLength+int(ks)]
 			key := common.ByteSliceToString(keyBuf)
-			valueBuf := data[cur+common.KvsByteLength+common.FlagByteLength+int(ks):cur+common.KvsByteLength+common.FlagByteLength+int(ks)+int(vs)]
+			valueBuf := data[cur+common.KvsByteLength+common.FlagByteLength+int(ks) : cur+common.KvsByteLength+common.FlagByteLength+int(ks)+int(vs)]
 			dr := &dataRecord{
 				dateHeader: &dataHeader{
 					Ks:   int32(ks),
@@ -182,7 +182,7 @@ func (s *Server) DbSync() error{				// slaves sync update data
 				key:   keyBuf,
 				value: valueBuf,
 			}
-			 var length int64
+			var length int64
 			if flag == common.DeleteFlag {
 				s.dB.iTable.remove(key)
 				length, err = s.dB.WriteRecordNoCrc32(dr)
@@ -190,7 +190,7 @@ func (s *Server) DbSync() error{				// slaves sync update data
 					common.Error.Printf("Slave write record err: %s\n", err)
 					return err
 				}
-			}else {
+			} else {
 				ri := &recordIndex{offset: size, size: int(length)}
 				s.dB.iTable.put(key, ri)
 				length, err = s.dB.WriteRecord(dr)
@@ -205,7 +205,7 @@ func (s *Server) DbSync() error{				// slaves sync update data
 	return nil
 }
 
-func (s *Server) IsMaster() bool  { 	// judge server is master or not
+func (s *Server) IsMaster() bool { // judge server is master or not
 	intranet, err := common.GetIntranetIp()
 	if err != nil {
 		common.Error.Fatalf("Check your Web environment， make sure your machine has intranet ip.")
@@ -238,7 +238,7 @@ func (s *Server) Start() error {
 	return err
 }
 
-func (s *Server) Close() error  {	// close server, stop provide service
+func (s *Server) Close() error { // close server, stop provide service
 	err := s.echo.Close()
 	if err != nil {
 		return err
@@ -264,10 +264,10 @@ func init() {
 	slave = strings.Replace(slave, "}", "", 1)
 	slaves := strings.Split(slave, ",")
 	Sev = &Server{
-		master: c.ConfMap["server.master"],
-		slaves: slaves,
-		echo:   echo.New(),
-		dB:     OpenDB(c.ConfMap["db.datafile"]),
+		master:    c.ConfMap["server.master"],
+		slaves:    slaves,
+		echo:      echo.New(),
+		dB:        OpenDB(c.ConfMap["db.datafile"]),
 		notifiers: make(map[string]chan struct{}),
 	}
 	errChan := make(chan error)

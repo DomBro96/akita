@@ -9,12 +9,12 @@ import (
 )
 
 type SyncData struct {
-	code int `json:"code"`
+	code int    `json:"code"`
 	data []byte `json:"data"`
 }
 
 func save(ctx echo.Context) error {
-	if ! Sev.IsMaster() {
+	if !Sev.IsMaster() {
 		return ctx.JSON(http.StatusBadRequest, "sorry this akita node isn't master node! ")
 	}
 	key := ctx.FormValue("key")
@@ -62,7 +62,7 @@ func search(ctx echo.Context) error {
 }
 
 func del(ctx echo.Context) error {
-	if ! Sev.IsMaster() {
+	if !Sev.IsMaster() {
 		return ctx.JSON(http.StatusBadRequest, "sorry this akita node isn't master node! ")
 	}
 	key := ctx.QueryParam("key")
@@ -76,8 +76,8 @@ func del(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, delOffset)
 }
 
-func syn(ctx echo.Context) error {		// deal with slaves sync request
-	if ! Sev.IsMaster() {
+func syn(ctx echo.Context) error { // deal with slaves sync request
+	if !Sev.IsMaster() {
 		return ctx.JSON(http.StatusBadRequest, nil)
 	}
 	offsetStr := ctx.QueryParam("offset")
@@ -94,7 +94,7 @@ func syn(ctx echo.Context) error {		// deal with slaves sync request
 			select {
 			case <-time.After(1000 * time.Millisecond):
 				return ctx.JSON(http.StatusOK, syncData)
-			case  <-notifier:
+			case <-notifier:
 				data, err = Sev.dB.getDataByOffset(int64(offset))
 				if err != nil {
 					common.Error.Printf("Get data by offset error :%s\n", err)
@@ -104,7 +104,7 @@ func syn(ctx echo.Context) error {		// deal with slaves sync request
 				syncData.data = data
 				return ctx.JSON(http.StatusOK, syncData)
 			}
-		}else {
+		} else {
 			common.Error.Printf("Get data by offset error :%s\n", err)
 			return ctx.JSON(http.StatusOK, syncData)
 		}

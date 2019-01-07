@@ -47,8 +47,7 @@ func OpenDB(path string) *DB {
 	return db
 }
 
-
-func (db *DB) Reload() error {		// reload database index table
+func (db *DB) Reload() error { // reload database index table
 	if db.size < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
 		return nil
 	}
@@ -80,7 +79,7 @@ func (db *DB) Reload() error {		// reload database index table
 			db.iTable.remove(key)
 		} else {
 			rs += common.CrcByteLength
-			ri := recordIndex {
+			ri := recordIndex{
 				offset: offset,
 				size:   rs,
 			}
@@ -119,7 +118,7 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	return valueBuf, nil
 }
 
-func (db *DB) WriteRecord(record *dataRecord) (int64, error) {	// write a record to data file
+func (db *DB) WriteRecord(record *dataRecord) (int64, error) { // write a record to data file
 	recordBuf, err := record.getRecordBuf()
 	if err != nil {
 		return 0, err
@@ -172,7 +171,7 @@ func (db *DB) getDataByOffset(offset int64) ([]byte, error) {
 	return data, nil
 }
 
-func (db *DB) Close() error  {
+func (db *DB) Close() error {
 	err := db.dataFile.Close()
 	if err != nil {
 		common.Error.Printf("Data file close err: %s\n", err)

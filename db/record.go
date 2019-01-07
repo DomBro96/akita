@@ -12,8 +12,8 @@ type (
 
 	dataRecord struct {
 		dateHeader *dataHeader
-		key        []byte	// key bytes
-		value      []byte	// value bytes
+		key        []byte // key bytes
+		value      []byte // value bytes
 	}
 )
 

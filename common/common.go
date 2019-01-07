@@ -15,14 +15,14 @@ import (
 func ByteSliceToInt32(bufByte []byte) (int32, error) {
 	buf := bytes.NewBuffer(bufByte)
 	var i int32
-	err := binary.Read(buf, binary.BigEndian, &i)	// use big end way read bytes to int32
+	err := binary.Read(buf, binary.BigEndian, &i) // use big end way read bytes to int32
 	return i, err
 }
 
 func Int32ToByteSlice(i int32) ([]byte, error) {
 	s1 := make([]byte, 0)
 	buf := bytes.NewBuffer(s1)
-	err := binary.Write(buf, binary.BigEndian, i)	// use big end way write int32 to int32
+	err := binary.Write(buf, binary.BigEndian, i) // use big end way write int32 to int32
 	bufByte := buf.Bytes()
 	return bufByte, err
 }
@@ -30,7 +30,7 @@ func Int32ToByteSlice(i int32) ([]byte, error) {
 func UintToByteSlice(u uint32) ([]byte, error) {
 	s1 := make([]byte, 0)
 	buf := bytes.NewBuffer(s1)
-	err := binary.Write(buf, binary.BigEndian, u)	// use big end way write uint32 to int32
+	err := binary.Write(buf, binary.BigEndian, u) // use big end way write uint32 to int32
 	bufByte := buf.Bytes()
 	return bufByte, err
 }
@@ -38,7 +38,7 @@ func UintToByteSlice(u uint32) ([]byte, error) {
 func ByteSliceToUint(bufByte []byte) (uint32, error) {
 	buf := bytes.NewBuffer(bufByte)
 	var u uint32
-	err := binary.Read(buf, binary.BigEndian, &u)	// use big end way read bytes to uint32
+	err := binary.Read(buf, binary.BigEndian, &u) // use big end way read bytes to uint32
 	return u, err
 }
 
@@ -98,7 +98,7 @@ func GetIntranetIp() (string, error) {
 	for _, a := range adds {
 		if ipNet, ok := a.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
 			if ipNet.IP.To4() != nil {
-				 intranetIp = ipNet.IP.String()
+				intranetIp = ipNet.IP.String()
 			}
 		}
 	}

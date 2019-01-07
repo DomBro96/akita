@@ -44,7 +44,6 @@ func GetDefaultTransport() http.RoundTripper {
 	return defaultTransport
 }
 
-
 type (
 	HttpClient struct {
 		client http.Client

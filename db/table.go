@@ -14,7 +14,7 @@ type (
 	indexTable struct {
 		table  map[string]*recordIndex
 		rwLock sync.RWMutex
-		usage  int          // memory size of database index table
+		usage  int // memory size of database index table
 	}
 )
 

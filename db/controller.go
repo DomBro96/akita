@@ -8,12 +8,6 @@ import (
 	"time"
 )
 
-type syncData struct {
-	code       int
-	data       []byte
-	masterSize int64
-}
-
 func save(ctx echo.Context) error {
 	if !Sev.IsMaster() {
 		return ctx.JSON(http.StatusBadRequest, "sorry this akita node isn't master node! ")
@@ -84,9 +78,9 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 	offsetStr := ctx.QueryParam("offset")
 	offset, _ := strconv.Atoi(offsetStr)
 	data, err := Sev.dB.getDataByOffset(int64(offset))
-	syncData := &syncData{
-		code: 0,
-		data: nil,
+	syncData := &SyncData{
+		Code: 0,
+		Data: nil,
 	}
 	if err != nil {
 		if err == common.ErrNoDataUpdate {
@@ -102,8 +96,8 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 					common.Error.Printf("Get data by offset error :%s\n", err)
 					return ctx.JSON(http.StatusOK, syncData)
 				}
-				syncData.code = 1
-				syncData.data = data
+				syncData.Code = 1
+				syncData.Data = data
 				return ctx.JSON(http.StatusOK, syncData)
 			}
 		} else {
@@ -111,9 +105,8 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 			return ctx.JSON(http.StatusOK, syncData)
 		}
 	}else {
-		syncData.code = 1
-		syncData.data = data
-		// protobuf
+		syncData.Code = 1
+		syncData.Data = data
 		common.Info.Printf("the data length is %d\n", len(data))
 		return ctx.JSON(http.StatusOK, syncData)
 	}

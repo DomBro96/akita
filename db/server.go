@@ -131,7 +131,7 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 	return true, ri.offset, nil
 }
 
-func (s *Server) DbSync() error { // slaves sync update data
+func (s *Server) DbSync() error { //  sync update data
 	s.dB.lock.Lock()
 	size := s.dB.size
 	s.dB.lock.Unlock()
@@ -148,63 +148,8 @@ func (s *Server) DbSync() error { // slaves sync update data
 		common.Error.Printf("Unmarsha data to json fail: %s\n", err)
 		return err
 	}
-	if dataMap["code"] != 0 && dataMap["data"] != nil{
-		data := []byte(dataMap["data"].(string))
-		common.Info.Printf("recive data size is %d \n", len(data))
-		index := 0
-		for index < len(data) {
-			ksBuf := data[index : index+common.KsByteLength]
-			vsBuf := data[index+common.KsByteLength : index+common.KvsByteLength]
-			ks, err := common.ByteSliceToInt32(ksBuf)
-			if err != nil {
-				common.Error.Printf("Bytes to int err: %s\n", err)
-				return err
-			}
-			vs, err := common.ByteSliceToInt32(vsBuf)
-			if err != nil {
-				common.Error.Printf("Bytes to int err: %s\n", err)
-				return err
-			}
-			flagBuf := data[index+common.KvsByteLength : index+common.KvsByteLength+common.FlagByteLength]
-			flag, err := common.ByteSliceToInt32(flagBuf)
-			if err != nil {
-				common.Error.Printf("Bytes to int err: %s\n", err)
-				return err
-			}
-			keyBuf := data[index+common.KvsByteLength+common.FlagByteLength : index+common.KvsByteLength+common.FlagByteLength+int(ks)]
-			key := common.ByteSliceToString(keyBuf)
-			valueBuf := data[index+common.KvsByteLength+common.FlagByteLength+int(ks) : index+common.KvsByteLength+common.FlagByteLength+int(ks)+int(vs)]
-			dr := &dataRecord{
-				dateHeader: &dataHeader{
-					Ks:   int32(ks),
-					Vs:   int32(vs),
-					Flag: flag,
-				},
-				key:   keyBuf,
-				value: valueBuf,
-			}
-			var length int64
-			if flag == common.DeleteFlag {
-				s.dB.iTable.remove(key)
-				length, err = s.dB.WriteRecordNoCrc32(dr)
-				if err != nil {
-					common.Error.Printf("Slave write record err: %s\n", err)
-					return err
-				}
-			} else {
-				ri := &recordIndex{offset: size, size: int(length)}
-				s.dB.iTable.put(key, ri)
-				length, err = s.dB.WriteRecord(dr)
-				if err != nil {
-					common.Error.Printf("Slave write record err: %s\n", err)
-					return err
-				}
-			}
-			index += int(length)
-		}
-	}
-	return nil
 }
+
 
 func (s *Server) IsMaster() bool { // judge server is master or not
 	intranet, err := common.GetIntranetIp()

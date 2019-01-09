@@ -48,18 +48,26 @@ func OpenDB(path string) *DB {
 }
 
 func (db *DB) Reload() error { // reload database index table
-	if db.size < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
+	var length int64
+	db.lock.Lock()
+	if length = db.size ; length < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
 		return nil
 	}
+	db.lock.Unlock()
 	var offset int64 = 0
-	dataBuff, err := common.ReadFileToByte(db.dataFile, offset, db.size)
+	return db.UpdateTable(offset, length)
+}
+
+func (db *DB) UpdateTable(offset int64, length int64) error {
+	dataBuf, err := common.ReadFileToByte(db.dataFile, offset, length)
 	if err != nil {
 		return err
 	}
-	for offset < db.size {
-		ksBuf := dataBuff[offset:(offset + common.KsByteLength)]
-		vsBuf := dataBuff[(offset + common.KsByteLength):(offset + common.KvsByteLength)]
-		flagBuf := dataBuff[(offset + common.KvsByteLength):(offset + common.KvsByteLength + common.FlagByteLength)]
+	for offset < length {
+		ksBuf := dataBuf[offset:(offset + common.KsByteLength)]
+		vsBuf := dataBuf[(offset + common.KsByteLength):(offset + common.KvsByteLength)]
+		flagBuf := dataBuf[(offset + common.KvsByteLength):(offset + common.KvsByteLength + common.FlagByteLength)]
+
 		ks, err := common.ByteSliceToInt32(ksBuf)
 		if err != nil {
 			return err
@@ -72,7 +80,7 @@ func (db *DB) Reload() error { // reload database index table
 		if err != nil {
 			return err
 		}
-		keyBuf := dataBuff[(offset + common.KvsByteLength + common.FlagByteLength):(offset + common.KvsByteLength + common.FlagByteLength + int64(ks))]
+		keyBuf := dataBuf[(offset + common.KvsByteLength + common.FlagByteLength):(offset + common.KvsByteLength + common.FlagByteLength + int64(ks))]
 		key := common.ByteSliceToString(keyBuf)
 		rs := common.KvsByteLength + common.FlagByteLength + int(ks) + int(vs)
 		if flag == common.DeleteFlag {
@@ -177,5 +185,26 @@ func (db *DB) Close() error {
 		common.Error.Printf("data file close err: %s\n", err)
 		return err
 	}
+	return nil
+}
+
+func (db *DB)WriteSyncData(dataBuf []byte) error {
+	var offset int64
+	db.lock.Lock()
+	offset = db.size
+	length, err := common.WriteBufToFile(db.dataFile, offset, dataBuf)
+	if err != nil {
+		common.Error.Printf("write sync data error: %s\n", err)
+		return err
+	}
+	db.lock.Unlock()
+	err = db.UpdateTable(offset, length)
+	if err != nil {
+		common.Error.Printf("update index table error: %s\n", err)
+		return err
+	}
+	db.lock.Lock()
+	db.size += length
+	db.lock.Unlock()
 	return nil
 }

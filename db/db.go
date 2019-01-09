@@ -174,7 +174,7 @@ func (db *DB) getDataByOffset(offset int64) ([]byte, error) {
 func (db *DB) Close() error {
 	err := db.dataFile.Close()
 	if err != nil {
-		common.Error.Printf("Data file close err: %s\n", err)
+		common.Error.Printf("data file close err: %s\n", err)
 		return err
 	}
 	return nil

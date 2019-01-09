@@ -8,9 +8,10 @@ import (
 	"time"
 )
 
-type SyncData struct {
-	Code int    `json:"code"`
-	Data []byte `json:"data"`
+type syncData struct {
+	code       int
+	data       []byte
+	masterSize int64
 }
 
 func save(ctx echo.Context) error {
@@ -83,9 +84,9 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 	offsetStr := ctx.QueryParam("offset")
 	offset, _ := strconv.Atoi(offsetStr)
 	data, err := Sev.dB.getDataByOffset(int64(offset))
-	syncData := &SyncData{
-		Code: 0,
-		Data: nil,
+	syncData := &syncData{
+		code: 0,
+		data: nil,
 	}
 	if err != nil {
 		if err == common.ErrNoDataUpdate {
@@ -101,8 +102,8 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 					common.Error.Printf("Get data by offset error :%s\n", err)
 					return ctx.JSON(http.StatusOK, syncData)
 				}
-				syncData.Code = 1
-				syncData.Data = data
+				syncData.code = 1
+				syncData.data = data
 				return ctx.JSON(http.StatusOK, syncData)
 			}
 		} else {
@@ -110,8 +111,9 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 			return ctx.JSON(http.StatusOK, syncData)
 		}
 	}else {
-		syncData.Code = 1
-		syncData.Data = data
+		syncData.code = 1
+		syncData.data = data
+		// protobuf
 		common.Info.Printf("the data length is %d\n", len(data))
 		return ctx.JSON(http.StatusOK, syncData)
 	}

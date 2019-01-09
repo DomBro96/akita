@@ -147,9 +147,8 @@ func (s *Server) DbSync() error { // slaves sync update data
 		common.Error.Printf("Unmarsha data to json fail: %s\n", err)
 		return err
 	}
-
 	cur := 0
-	if dataMap["code"] != 0 {
+	if dataMap["code"] != 0 && dataMap["data"] != nil{
 		data := dataMap["data"].([]byte)
 		for cur < len(data) {
 			ksBuf := data[cur : cur+common.KsByteLength]

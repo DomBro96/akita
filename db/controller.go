@@ -96,6 +96,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 				return ctx.JSON(http.StatusOK, syncData)
 			case <-notifier:
 				data, err = Sev.dB.getDataByOffset(int64(offset))
+				common.Info.Printf("the data length is %d\n", len(data))
 				if err != nil {
 					common.Error.Printf("Get data by offset error :%s\n", err)
 					return ctx.JSON(http.StatusOK, syncData)
@@ -108,8 +109,11 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 			common.Error.Printf("Get data by offset error :%s\n", err)
 			return ctx.JSON(http.StatusOK, syncData)
 		}
+	}else {
+		syncData.code = 1
+		syncData.data = data
+		common.Info.Printf("the data length is %d\n", len(data))
+		return ctx.JSON(http.StatusOK, syncData)
 	}
-	syncData.code = 1
-	syncData.data = data
-	return ctx.JSON(http.StatusOK, syncData)
+	return nil
 }

@@ -132,10 +132,10 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 }
 
 func (s *Server) DbSync() error { // slaves sync update data
-	hc := common.NewHttpClient(2000 * time.Millisecond)
 	s.dB.lock.Lock()
 	size := s.dB.size
 	s.dB.lock.Unlock()
+	hc := common.NewHttpClient(2000 * time.Millisecond)
 	offset := strconv.Itoa(int(size))
 	url := "http://" + s.master + ":" + port + "/akita/syn?offset=" + offset
 	repData, err := hc.Get(url)
@@ -148,12 +148,13 @@ func (s *Server) DbSync() error { // slaves sync update data
 		common.Error.Printf("Unmarsha data to json fail: %s\n", err)
 		return err
 	}
-	cur := 0
 	if dataMap["code"] != 0 && dataMap["data"] != nil{
-		data := dataMap["data"].([]byte)
-		for cur < len(data) {
-			ksBuf := data[cur : cur+common.KsByteLength]
-			vsBuf := data[cur+common.KsByteLength : cur+common.KvsByteLength]
+		data := []byte(dataMap["data"].(string))
+		common.Info.Printf("recive data size is %d \n", len(data))
+		index := 0
+		for index < len(data) {
+			ksBuf := data[index : index+common.KsByteLength]
+			vsBuf := data[index+common.KsByteLength : index+common.KvsByteLength]
 			ks, err := common.ByteSliceToInt32(ksBuf)
 			if err != nil {
 				common.Error.Printf("Bytes to int err: %s\n", err)
@@ -164,15 +165,15 @@ func (s *Server) DbSync() error { // slaves sync update data
 				common.Error.Printf("Bytes to int err: %s\n", err)
 				return err
 			}
-			flagBuf := data[cur+common.KvsByteLength : cur+common.KvsByteLength+common.FlagByteLength]
+			flagBuf := data[index+common.KvsByteLength : index+common.KvsByteLength+common.FlagByteLength]
 			flag, err := common.ByteSliceToInt32(flagBuf)
 			if err != nil {
 				common.Error.Printf("Bytes to int err: %s\n", err)
 				return err
 			}
-			keyBuf := data[cur+common.KvsByteLength+common.FlagByteLength : cur+common.KvsByteLength+common.FlagByteLength+int(ks)]
+			keyBuf := data[index+common.KvsByteLength+common.FlagByteLength : index+common.KvsByteLength+common.FlagByteLength+int(ks)]
 			key := common.ByteSliceToString(keyBuf)
-			valueBuf := data[cur+common.KvsByteLength+common.FlagByteLength+int(ks) : cur+common.KvsByteLength+common.FlagByteLength+int(ks)+int(vs)]
+			valueBuf := data[index+common.KvsByteLength+common.FlagByteLength+int(ks) : index+common.KvsByteLength+common.FlagByteLength+int(ks)+int(vs)]
 			dr := &dataRecord{
 				dateHeader: &dataHeader{
 					Ks:   int32(ks),
@@ -199,7 +200,7 @@ func (s *Server) DbSync() error { // slaves sync update data
 					return err
 				}
 			}
-			cur += int(length)
+			index += int(length)
 		}
 	}
 	return nil

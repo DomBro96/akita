@@ -136,7 +136,7 @@ func (s *Server) DbSync() error { // slaves sync update data
 	hc := common.NewHttpClient(2000 * time.Millisecond)
 	size := atomic.LoadInt64(&s.dB.size)
 	offset := strconv.Itoa(int(size))
-	url := "//" + s.master + ":" + port + "/akita/syn?offset=" + offset
+	url := "http://" + s.master + ":" + port + "/akita/syn?offset=" + offset
 	repData, err := hc.Get(url)
 	if err != nil {
 		common.Error.Printf("Sync request fail : %s\n", err)

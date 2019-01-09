@@ -13,3 +13,4 @@ ERROR: 2018/12/21 16:37:50 main.go:72: Status could not defined%!(EXTRA *errors.
 ERROR: 2018/12/21 16:38:45 main.go:72: Status could not defined%!(EXTRA *errors.errorString=Service is not installed)
 ERROR: 2019/01/09 10:11:21 main.go:79: Install Akita: A Simple Key-Value Database:					[[31mFAILED[0m]%!(EXTRA *errors.errorString=You must have root user privileges. Possibly using 'sudo' command should help)
 ERROR: 2019/01/09 10:11:43 main.go:79: Install Akita: A Simple Key-Value Database:					[[31mFAILED[0m]%!(EXTRA *errors.errorString=Service has already been installed)
+ERROR: 2019/01/09 11:19:33 main.go:79: Status could not defined%!(EXTRA *errors.errorString=Service is not installed)

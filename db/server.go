@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -134,7 +133,9 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 
 func (s *Server) DbSync() error { // slaves sync update data
 	hc := common.NewHttpClient(2000 * time.Millisecond)
-	size := atomic.LoadInt64(&s.dB.size)
+	s.dB.lock.Lock()
+	size := s.dB.size
+	s.dB.lock.Unlock()
 	offset := strconv.Itoa(int(size))
 	url := "http://" + s.master + ":" + port + "/akita/syn?offset=" + offset
 	repData, err := hc.Get(url)

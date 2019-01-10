@@ -48,14 +48,15 @@ func OpenDB(path string) *DB {
 }
 
 func (db *DB) Reload() error { // reload database index table
-	var length int64
 	db.lock.Lock()
-	if length = db.size; length < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
+	length := db.size
+	db.lock.Unlock()
+	if length < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
 		return nil
 	}
-	db.lock.Unlock()
 	var offset int64 = 0
-	return db.UpdateTable(offset, length)
+	err := db.UpdateTable(offset, length)
+	return err
 }
 
 func (db *DB) UpdateTable(offset int64, length int64) error {
@@ -93,7 +94,9 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 			}
 			db.iTable.put(key, &ri)
 		}
+		db.lock.Lock()
 		offset += int64(rs)
+		db.lock.Unlock()
 	}
 	return nil
 }

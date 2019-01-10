@@ -133,9 +133,11 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 }
 
 func (s *Server) DbSync() error { // sync update data
+	common.Info.Println("sync start, locking")
 	s.dB.lock.Lock()
 	offset := s.dB.size
 	s.dB.lock.Unlock()
+	common.Info.Println("sync start, unlocking")
 	syncOffset := &SyncOffset{
 		Offset: offset,
 	}

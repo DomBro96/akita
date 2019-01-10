@@ -155,12 +155,11 @@ func (s *Server) DbSync() error { // sync update data
 		return err
 	}
 	if syncData.Code != 0 {
-		err = s.dB.WriteSyncData(syncData.Data) 	// write sync data
+		err = s.dB.WriteSyncData(syncData.Data) // write sync data
 		return err
 	}
 	return nil
 }
-
 
 func (s *Server) IsMaster() bool { // judge server is master or not
 	intranet, err := common.GetIntranetIp()

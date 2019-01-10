@@ -96,7 +96,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 		return err
 	}
 	data, err := Sev.dB.getDataByOffset(syncOffset.Offset)
-	ctx.Response().Header().Set("content-type", "application/protobuf")	// use protobuf format to transport data
+	ctx.Response().Header().Set("content-type", "application/protobuf") // use protobuf format to transport data
 	syncData := &SyncData{}
 	if err != nil {
 		if err == common.ErrNoDataUpdate {
@@ -107,7 +107,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 				syncData.Code = 0
 				syncData.Data = nil
 			case <-notifier:
-				data, err = Sev.dB.getDataByOffset(int64(offset))
+				data, err = Sev.dB.getDataByOffset(syncOffset.Offset)
 				common.Info.Printf("the data length is %d\n", len(data))
 				if err != nil {
 					common.Error.Printf("Get data by offset error :%s\n", err)
@@ -122,7 +122,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 			syncData.Code = 0
 			syncData.Data = nil
 		}
-	}else {
+	} else {
 		syncData.Code = 1
 		syncData.Data = data
 		common.Info.Printf("the data length is %d\n", len(data))

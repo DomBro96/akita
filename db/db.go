@@ -50,7 +50,7 @@ func OpenDB(path string) *DB {
 func (db *DB) Reload() error { // reload database index table
 	var length int64
 	db.lock.Lock()
-	if length = db.size ; length < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
+	if length = db.size; length < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
 		return nil
 	}
 	db.lock.Unlock()
@@ -188,7 +188,7 @@ func (db *DB) Close() error {
 	return nil
 }
 
-func (db *DB)WriteSyncData(dataBuf []byte) error {
+func (db *DB) WriteSyncData(dataBuf []byte) error {
 	var offset int64
 	db.lock.Lock()
 	offset = db.size

@@ -72,13 +72,13 @@ func (hc *HttpClient) PostForm(url string, args url.Values) (int, []byte, error)
 }
 
 func (hc *HttpClient) Post(url string, contentType string, body io.Reader) (int, []byte, error) {
-	 resp, err := hc.client.Post(url, contentType, body)
-	 if err != nil {
-	 	return 0, nil, err
-	 }
-	 defer resp.Body.Close()
-	 data, err := ioutil.ReadAll(resp.Body)
-	 return resp.StatusCode, data, err
+	resp, err := hc.client.Post(url, contentType, body)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	return resp.StatusCode, data, err
 }
 
 func (hc *HttpClient) Get(url string) ([]byte, error) {

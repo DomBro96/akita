@@ -2,12 +2,13 @@ package db
 
 import (
 	"akita/common"
+	"bytes"
+	"github.com/golang/protobuf/proto"
 	"github.com/labstack/echo"
 	"mime/multipart"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -131,23 +132,33 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 	return true, ri.offset, nil
 }
 
-func (s *Server) DbSync() error { //  sync update data
+func (s *Server) DbSync() error { // sync update data
 	s.dB.lock.Lock()
-	size := s.dB.size
+	offset := s.dB.size
 	s.dB.lock.Unlock()
+	syncOffset := &SyncOffset{
+		Offset: offset,
+	}
+	protoData, _ := proto.Marshal(syncOffset)
+	reader := bytes.NewReader(protoData)
 	hc := common.NewHttpClient(2000 * time.Millisecond)
-	offset := strconv.Itoa(int(size))
-	url := "http://" + s.master + ":" + port + "/akita/syn?offset=" + offset
-	repData, err := hc.Get(url)
-	if err != nil {
-		common.Error.Printf("Sync request fail : %s\n", err)
+	url := "http://" + s.master + ":" + port + "/akita/syn"
+	statusCode, data, err := hc.Post(url, "application/protobuf", reader)
+	if statusCode == 400 || statusCode == 500 {
+		common.Info.Printf("sync data from fail info : %s\n", err)
 		return err
 	}
-	dataMap, err := common.UnmarshalData(repData)
+	syncData := &SyncData{}
+	err = proto.Unmarshal(data, syncData)
 	if err != nil {
-		common.Error.Printf("Unmarsha data to json fail: %s\n", err)
+		common.Error.Printf("proto data unmarshal error: %s \n", err)
 		return err
 	}
+	if syncData.Code != 0 {
+		err = s.dB.WriteSyncData(syncData.Data) 	// write sync data
+		return err
+	}
+	return nil
 }
 
 

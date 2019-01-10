@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package db;
+ package db;
 
-message SyncData {
-        int32 Code = 8;
-    	bytes Data = 7;
-}
+ message SyncData {
+         int32 Code = 8;
+     	bytes Data = 7;
+ }

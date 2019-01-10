@@ -1,6 +1,7 @@
 package common
 
 import (
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -59,7 +60,7 @@ func NewHttpClient(timeout time.Duration) *HttpClient {
 	}
 }
 
-func (hc *HttpClient) Post(url string, args url.Values) (int, []byte, error) {
+func (hc *HttpClient) PostForm(url string, args url.Values) (int, []byte, error) {
 	resp, err := hc.client.PostForm(url, args)
 	if err != nil {
 		return 0, nil, err
@@ -68,6 +69,16 @@ func (hc *HttpClient) Post(url string, args url.Values) (int, []byte, error) {
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	return resp.StatusCode, data, err
+}
+
+func (hc *HttpClient) Post(url string, contentType string, body io.Reader) (int, []byte, error) {
+	 resp, err := hc.client.Post(url, contentType, body)
+	 if err != nil {
+	 	return 0, nil, err
+	 }
+	 defer resp.Body.Close()
+	 data, err := ioutil.ReadAll(resp.Body)
+	 return resp.StatusCode, data, err
 }
 
 func (hc *HttpClient) Get(url string) ([]byte, error) {

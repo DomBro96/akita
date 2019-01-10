@@ -2,9 +2,9 @@ package db
 
 import (
 	"akita/common"
+	"github.com/golang/protobuf/proto"
 	"github.com/labstack/echo"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -73,42 +73,63 @@ func del(ctx echo.Context) error {
 
 func syn(ctx echo.Context) error { // deal with slaves sync request
 	if !Sev.IsMaster() {
-		return ctx.JSON(http.StatusBadRequest, nil)
+		http.Error(ctx.Response(), "sorry, slaves server can not sync data", http.StatusBadRequest)
+		return nil
 	}
-	offsetStr := ctx.QueryParam("offset")
-	offset, _ := strconv.Atoi(offsetStr)
-	data, err := Sev.dB.getDataByOffset(int64(offset))
-	syncData := &SyncData{
-		Code: 0,
-		Data: nil,
+	reqBody, err := ctx.Request().GetBody()
+	defer reqBody.Close()
+	if err != nil {
+		http.Error(ctx.Response(), err.Error(), http.StatusBadRequest)
+		return err
 	}
+	offsetBuf := make([]byte, 0)
+	_, err = reqBody.Read(offsetBuf)
+	if err != nil {
+		http.Error(ctx.Response(), err.Error(), http.StatusBadRequest)
+		return err
+	}
+	syncOffset := &SyncOffset{}
+	err = proto.Unmarshal(offsetBuf, syncOffset)
+	if err != nil {
+		common.Error.Printf("proto data unmarshal error: %s \n", err)
+		http.Error(ctx.Response(), err.Error(), http.StatusInternalServerError)
+		return err
+	}
+	data, err := Sev.dB.getDataByOffset(syncOffset.Offset)
+	ctx.Response().Header().Set("content-type", "application/protobuf")	// use protobuf format to transport data
+	syncData := &SyncData{}
 	if err != nil {
 		if err == common.ErrNoDataUpdate {
 			notifier := make(chan struct{})
 			Sev.register(ctx.Request().Host, notifier)
 			select {
 			case <-time.After(1000 * time.Millisecond):
-				return ctx.JSON(http.StatusOK, syncData)
+				syncData.Code = 0
+				syncData.Data = nil
 			case <-notifier:
 				data, err = Sev.dB.getDataByOffset(int64(offset))
 				common.Info.Printf("the data length is %d\n", len(data))
 				if err != nil {
 					common.Error.Printf("Get data by offset error :%s\n", err)
-					return ctx.JSON(http.StatusOK, syncData)
+					syncData.Code = 0
+					syncData.Data = nil
 				}
 				syncData.Code = 1
 				syncData.Data = data
-				return ctx.JSON(http.StatusOK, syncData)
 			}
 		} else {
 			common.Error.Printf("Get data by offset error :%s\n", err)
-			return ctx.JSON(http.StatusOK, syncData)
+			syncData.Code = 0
+			syncData.Data = nil
 		}
 	}else {
 		syncData.Code = 1
 		syncData.Data = data
 		common.Info.Printf("the data length is %d\n", len(data))
-		return ctx.JSON(http.StatusOK, syncData)
+	}
+	protoData, _ := proto.Marshal(syncData)
+	if _, err = ctx.Response().Write(protoData); err != nil { // if response error, reply 500 error
+		http.Error(ctx.Response(), err.Error(), http.StatusInternalServerError)
 	}
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 const (
@@ -51,6 +52,7 @@ func (service *Service) Manage() (string, error) {
 		go func() {
 			for {
 				db.Sev.DbSync()
+				time.Sleep(500 * time.Millisecond)	// do sync request every half second
 			}
 		}()
 	}

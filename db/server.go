@@ -139,12 +139,20 @@ func (s *Server) DbSync() error { // sync update data
 	syncOffset := &SyncOffset{
 		Offset: offset,
 	}
-	protoData, _ := proto.Marshal(syncOffset)
+	protoData, err := proto.Marshal(syncOffset)
+	if err != nil {
+		common.Error.Printf("marshal data to proto error: %s\n", err)
+		return err
+	}
 	reader := bytes.NewReader(protoData)
 	hc := common.NewHttpClient(2000 * time.Millisecond)
 	url := "http://" + s.master + ":" + port + "/akita/syn"
 	statusCode, data, err := hc.Post(url, "application/protobuf", reader)
-	if statusCode == 400 || statusCode == 500 {
+	if err != nil {
+		common.Error.Printf("sync request fail: %s\n", err)
+		return err
+	}
+	if statusCode != 200 {
 		common.Info.Printf("sync data from fail info : %s\n", err)
 		return err
 	}

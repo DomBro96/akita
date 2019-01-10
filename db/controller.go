@@ -77,6 +77,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 		return nil
 	}
 	reqBody, err := ctx.Request().GetBody()
+	common.Info.Printf("accept sync request...\n")
 	defer reqBody.Close()
 	if err != nil {
 		http.Error(ctx.Response(), err.Error(), http.StatusBadRequest)
@@ -84,6 +85,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 	}
 	offsetBuf := make([]byte, 0)
 	_, err = reqBody.Read(offsetBuf)
+	common.Info.Printf("data length is %d\n", len(offsetBuf))
 	if err != nil {
 		http.Error(ctx.Response(), err.Error(), http.StatusBadRequest)
 		return err
@@ -95,8 +97,8 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 		http.Error(ctx.Response(), err.Error(), http.StatusInternalServerError)
 		return err
 	}
-	data, err := Sev.dB.getDataByOffset(syncOffset.Offset)
-	ctx.Response().Header().Set("content-type", "application/protobuf") // use protobuf format to transport data
+	common.Info.Printf("request offset is %d\n", syncOffset.Offset)
+	data, err := Sev.dB.GetDataByOffset(syncOffset.Offset)
 	syncData := &SyncData{}
 	if err != nil {
 		if err == common.ErrNoDataUpdate {
@@ -107,10 +109,10 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 				syncData.Code = 0
 				syncData.Data = nil
 			case <-notifier:
-				data, err = Sev.dB.getDataByOffset(syncOffset.Offset)
+				data, err = Sev.dB.GetDataByOffset(syncOffset.Offset)
 				common.Info.Printf("the data length is %d\n", len(data))
 				if err != nil {
-					common.Error.Printf("Get data by offset error :%s\n", err)
+					common.Error.Printf("get data by offset error :%s\n", err)
 					syncData.Code = 0
 					syncData.Data = nil
 				}
@@ -118,7 +120,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 				syncData.Data = data
 			}
 		} else {
-			common.Error.Printf("Get data by offset error :%s\n", err)
+			common.Error.Printf("get data by offset error :%s\n", err)
 			syncData.Code = 0
 			syncData.Data = nil
 		}
@@ -128,6 +130,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 		common.Info.Printf("the data length is %d\n", len(data))
 	}
 	protoData, _ := proto.Marshal(syncData)
+	ctx.Response().Header().Set("content-type", "application/protobuf") // use protobuf format to transport data
 	if _, err = ctx.Response().Write(protoData); err != nil { // if response error, reply 500 error
 		http.Error(ctx.Response(), err.Error(), http.StatusInternalServerError)
 	}

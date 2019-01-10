@@ -165,11 +165,11 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
 	return recordLength, nil
 }
 
-func (db *DB) getDataByOffset(offset int64) ([]byte, error) {
+func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 	db.lock.Lock()
 	length := db.size - offset
 	db.lock.Unlock()
-	if length == 0 {
+	if length <= 0 {
 		return nil, common.ErrNoDataUpdate
 	}
 	data, err := common.ReadFileToByte(db.dataFile, offset, length)
@@ -197,13 +197,11 @@ func (db *DB) WriteSyncData(dataBuf []byte) error {
 		common.Error.Printf("write sync data error: %s\n", err)
 		return err
 	}
-	db.lock.Unlock()
 	err = db.UpdateTable(offset, length)
 	if err != nil {
 		common.Error.Printf("update index table error: %s\n", err)
 		return err
 	}
-	db.lock.Lock()
 	db.size += length
 	db.lock.Unlock()
 	return nil

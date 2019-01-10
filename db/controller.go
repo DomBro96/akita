@@ -4,6 +4,7 @@ import (
 	"akita/common"
 	"github.com/golang/protobuf/proto"
 	"github.com/labstack/echo"
+	"io/ioutil"
 	"net/http"
 	"time"
 )
@@ -76,15 +77,11 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 		http.Error(ctx.Response(), "sorry, slaves server can not sync data", http.StatusBadRequest)
 		return nil
 	}
-	reqBody, err := ctx.Request().GetBody()
 	common.Info.Printf("accept sync request...\n")
+	reqBody := ctx.Request().Body
 	defer reqBody.Close()
-	if err != nil {
-		http.Error(ctx.Response(), err.Error(), http.StatusBadRequest)
-		return err
-	}
-	offsetBuf := make([]byte, 0)
-	_, err = reqBody.Read(offsetBuf)
+
+	offsetBuf, err := ioutil.ReadAll(reqBody)
 	common.Info.Printf("data length is %d\n", len(offsetBuf))
 	if err != nil {
 		http.Error(ctx.Response(), err.Error(), http.StatusBadRequest)
@@ -92,6 +89,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 	}
 	syncOffset := &SyncOffset{}
 	err = proto.Unmarshal(offsetBuf, syncOffset)
+	common.Info.Println(syncOffset)
 	if err != nil {
 		common.Error.Printf("proto data unmarshal error: %s \n", err)
 		http.Error(ctx.Response(), err.Error(), http.StatusInternalServerError)

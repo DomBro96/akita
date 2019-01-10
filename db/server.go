@@ -250,5 +250,5 @@ func init() {
 	Sev.echo.POST("/akita/save", save)
 	Sev.echo.GET("/akita/search", search)
 	Sev.echo.GET("/akita/del", del)
-	Sev.echo.GET("/akita/syn", syn)
+	Sev.echo.POST("/akita/syn", syn)
 }

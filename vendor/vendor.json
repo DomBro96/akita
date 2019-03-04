@@ -51,6 +51,18 @@
 			"revisionTime": "2018-11-10T20:33:03Z"
 		},
 		{
+			"checksumSHA1": "SEnjvwVyfuU2xBaOfXfwPD5MZqk=",
+			"path": "github.com/mattn/go-colorable",
+			"revision": "efa589957cd060542a26d2dd7832fd6a6c6c3ade",
+			"revisionTime": "2018-03-10T13:32:14Z"
+		},
+		{
+			"checksumSHA1": "GiVgQkx5acnq+JZtYiuHPlhHoso=",
+			"path": "github.com/mattn/go-isatty",
+			"revision": "3fb116b820352b7f0c281308a4d6250c22d94e27",
+			"revisionTime": "2018-08-30T10:17:45Z"
+		},
+		{
 			"checksumSHA1": "MlE3iO0btJSHnKRZbWvckwW42yI=",
 			"path": "github.com/takama/daemon",
 			"revision": "aa76b0035d1239b7bb3ae1bd84cd88ef2e0a1f1e",

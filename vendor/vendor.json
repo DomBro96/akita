@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "Y2MOwzNZfl4NRNDbLCZa6sgx7O0=",
+			"path": "github.com/golang/protobuf/proto",
+			"revision": "347cf4a86c1cb8d262994d8ef5924d4576c5b331",
+			"revisionTime": "2019-01-09T07:22:47Z"
+		},
+		{
 			"checksumSHA1": "iqWBA0GWNr+cwAdF2KVy1eq9mlU=",
 			"path": "github.com/golang/protobuf/protoc-gen-go",
 			"revision": "347cf4a86c1cb8d262994d8ef5924d4576c5b331",

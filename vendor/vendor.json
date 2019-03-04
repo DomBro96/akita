@@ -27,6 +27,30 @@
 			"revisionTime": "2018-12-05T16:13:48Z"
 		},
 		{
+			"checksumSHA1": "MPuJHi9fgD6ghoXomiSPkmQ+N5M=",
+			"path": "github.com/labstack/gommon",
+			"revision": "7fd9f68ece0bcb1a905fac8f1549f0083f71c51b",
+			"revisionTime": "2018-11-10T20:33:03Z"
+		},
+		{
+			"checksumSHA1": "wU6PVQ8WWtivzAsfEkTYJOjND3o=",
+			"path": "github.com/labstack/gommon/bytes",
+			"revision": "7fd9f68ece0bcb1a905fac8f1549f0083f71c51b",
+			"revisionTime": "2018-11-10T20:33:03Z"
+		},
+		{
+			"checksumSHA1": "R6DzcBLEP0BONPpsyr+11N7xh5w=",
+			"path": "github.com/labstack/gommon/color",
+			"revision": "7fd9f68ece0bcb1a905fac8f1549f0083f71c51b",
+			"revisionTime": "2018-11-10T20:33:03Z"
+		},
+		{
+			"checksumSHA1": "iPlSnDjuur4cK1G/7mJM/7frIm4=",
+			"path": "github.com/labstack/gommon/random",
+			"revision": "7fd9f68ece0bcb1a905fac8f1549f0083f71c51b",
+			"revisionTime": "2018-11-10T20:33:03Z"
+		},
+		{
 			"checksumSHA1": "MlE3iO0btJSHnKRZbWvckwW42yI=",
 			"path": "github.com/takama/daemon",
 			"revision": "aa76b0035d1239b7bb3ae1bd84cd88ef2e0a1f1e",

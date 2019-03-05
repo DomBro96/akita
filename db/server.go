@@ -133,11 +133,9 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 }
 
 func (s *Server) DbSync() error { // sync update data
-	common.Info.Println("sync start, locking")
 	s.dB.lock.Lock()
 	offset := s.dB.size
 	s.dB.lock.Unlock()
-	common.Info.Println("sync start, unlocking")
 	syncOffset := &SyncOffset{
 		Offset: offset,
 	}
@@ -195,13 +193,9 @@ func (s *Server) register(slaveHost string, notifier chan struct{}) {
 	s.notifiers[slaveHost] = notifier
 	s.rwLock.Unlock()
 }
-func (s *Server) Start() error {
-	err := s.echo.Start(":" + port)
-	if err != nil {
-		common.Error.Fatalf("Akita server start fail : %s\n", err)
-	}
-	common.Info.Printf("Akita server started. ")
-	return err
+func (s *Server) Start() {
+	common.Info.Println("Akita server starting... ")
+	s.echo.Start(":" + port)
 }
 
 func (s *Server) Close() error { // close server, stop provide service

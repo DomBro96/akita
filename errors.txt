@@ -1,1 +1,2 @@
-
+ERROR: 2019/03/05 19:10:03 server.go:199: Akita server start fail : http: Server closed
+ERROR: 2019/03/05 19:13:46 server.go:200: Akita server start fail : http: Server closed

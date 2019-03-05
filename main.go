@@ -3,10 +3,8 @@ package main
 import (
 	"akita/common"
 	"akita/db"
-	"fmt"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
-	"github.com/takama/daemon"
 	"html/template"
 	"io"
 	"net/http"
@@ -17,36 +15,36 @@ import (
 )
 
 const (
-	name        = "akita"
-	description = "Akita: A Simple Key-Value Database"
+	//name        = "akita"
+	//description = "Akita: A Simple Key-Value Database"
 	webAddr     = "0.0.0.0:8990"
 )
 
 var dependencies = []string{"labstack.echo", "takama.daemon"}
 
 type Service struct {
-	daemon.Daemon
+	//daemon.Daemon
 }
 
 func (service *Service) Manage() (string, error) {
-	usage := "Usage: akita install | remove | start | stop | status"
-	if len(os.Args) > 1 {
-		command := os.Args[1]
-		switch command {
-		case "install":
-			return service.Install()
-		case "remove":
-			return service.Remove()
-		case "start":
-			return service.Start()
-		case "stop":
-			return service.Stop()
-		case "status":
-			return service.Status()
-		default:
-			return usage, nil
-		}
-	}
+	//usage := "Usage: akita install | remove | start | stop | status"
+	//if len(os.Args) > 1 {
+	//	command := os.Args[1]
+	//	switch command {
+	//	case "install":
+	//		return service.Install()
+	//	case "remove":
+	//		return service.Remove()
+	//	case "start":
+	//		return service.Start()
+	//	case "stop":
+	//		return service.Stop()
+	//	case "status":
+	//		return service.Status()
+	//	default:
+	//		return usage, nil
+	//	}
+	//}
 	interrup := make(chan os.Signal, 1)
 	signal.Notify(interrup, os.Interrupt, os.Kill, syscall.SIGEMT)
 
@@ -76,7 +74,7 @@ func (service *Service) Manage() (string, error) {
 	}
 }
 
-// http://127.0.0.1:8989
+// http://127.0.0.1:8990
 func (service *Service) WebUI(webAddr string) {
 	e := echo.New()
 	// static path
@@ -96,7 +94,9 @@ func (service *Service) WebUI(webAddr string) {
 
 	service.webUIRouter(e)
 
-	e.Logger.Fatal(e.Start(webAddr))
+	//e.Logger.Fatal(e.Start(webAddr))
+	err := e.Start(webAddr)
+	common.Info.Println(err)
 }
 
 // router
@@ -120,11 +120,12 @@ func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Con
 }
 
 func main() {
-	srv, err := daemon.New(name, description, dependencies...)
-	if err != nil {
-		common.Error.Fatalf("Akita service start error: %s\n", err)
-	}
-	service := &Service{srv}
+	//srv, err := daemon.New(name, description, dependencies...)
+	//if err != nil {
+	//	common.Error.Fatalf("Akita service start error: %s\n", err)
+	//}
+
+	service := &Service{}
 	status, err := service.Manage()
 	if err != nil {
 		common.Error.Fatalf(status, err)
@@ -132,6 +133,5 @@ func main() {
 
 	// start webUI
 	go service.WebUI(webAddr)
-
-	fmt.Println(status)
+	common.Info.Println(status)
 }

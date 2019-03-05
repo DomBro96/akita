@@ -91,3 +91,8 @@ func TestGetIntranetIp(t *testing.T) {
 	}
 	fmt.Println(intranet)
 }
+
+func TestLogger(t *testing.T) {
+	Info.Println("hello")
+	Warning.Println("world")
+}

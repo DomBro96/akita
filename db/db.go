@@ -47,7 +47,8 @@ func OpenDB(path string) *DB {
 	return db
 }
 
-func (db *DB) Reload() error { // reload database index table
+// reload database index table
+func (db *DB) Reload() error {
 	db.lock.Lock()
 	length := db.size
 	db.lock.Unlock()
@@ -104,7 +105,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	recordBuf, err := common.ReadFileToByte(db.dataFile, offset, length)
 	if err != nil {
-		common.Error.Printf("Rear data from file error: %s\n", err)
+		common.Error.Printf("Read data from file error: %s\n", err)
 		return nil, err
 	}
 	ksBuf := recordBuf[0:common.KsByteLength]
@@ -129,7 +130,8 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	return valueBuf, nil
 }
 
-func (db *DB) WriteRecord(record *dataRecord) (int64, error) { // write a record to data file
+// write a record to data file
+func (db *DB) WriteRecord(record *dataRecord) (int64, error) {
 	recordBuf, err := record.getRecordBuf()
 	if err != nil {
 		return 0, err
@@ -191,6 +193,7 @@ func (db *DB) Close() error {
 	return nil
 }
 
+// salve server write sync data
 func (db *DB) WriteSyncData(dataBuf []byte) error {
 	var offset int64
 	db.lock.Lock()

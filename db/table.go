@@ -19,6 +19,7 @@ type (
 )
 
 const (
+	// record index memory size
 	recordIndexSize = int(unsafe.Sizeof(recordIndex{}))
 )
 

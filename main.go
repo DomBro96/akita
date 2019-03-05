@@ -19,7 +19,7 @@ import (
 const (
 	name        = "akita"
 	description = "Akita: A Simple Key-Value Database"
-	webAddr     = "0.0.0.0:8989"
+	webAddr     = "0.0.0.0:8990"
 )
 
 var dependencies = []string{"labstack.echo", "takama.daemon"}

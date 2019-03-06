@@ -118,7 +118,7 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 	errChan := make(chan error)
 	go func(from int64, record *dataRecord) {
 		defer wg.Done()
-		_, err := db.WriteRecord(record)
+		_, err := db.WriteRecordNoCrc32(record)
 		errChan <- err
 		return
 	}(db.size, dr)
@@ -172,7 +172,7 @@ func (s *Server) DbSync() error { // sync update data
 func (s *Server) IsMaster() bool { // judge server is master or not
 	intranet, err := common.GetIntranetIp()
 	if err != nil {
-		common.Error.Fatalf("Check your Web environment， make sure your machine has intranet ip.")
+		common.Error.Fatalf("check your web environment， make sure your machine has intranet ip.")
 	}
 	if intranet == s.master {
 		return true
@@ -194,20 +194,22 @@ func (s *Server) register(slaveHost string, notifier chan struct{}) {
 	s.rwLock.Unlock()
 }
 func (s *Server) Start() {
-	common.Info.Println("Akita server starting... ")
+	common.Info.Println("akita server starting... ")
 	s.echo.Start(":" + port)
 }
 
-func (s *Server) Close() error { // close server, stop provide service
-	err := s.echo.Close()
+func (s *Server) Close() { // close server, stop provide service
+	common.Info.Println("akita server stopping... ")
+	err := s.dB.Close()
 	if err != nil {
-		return err
+		common.Error.Printf("akita server stop fail %s\n", err)
 	}
-	err = s.dB.Close()
+	err = s.echo.Close()
 	if err != nil {
-		return err
+		common.Error.Fatalf("akita server stop fail %s\n", err)
+	} else {
+		common.Info.Println("akita server stopped. ")
 	}
-	return nil
 }
 
 func init() {

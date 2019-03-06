@@ -61,12 +61,6 @@
 			"path": "github.com/mattn/go-isatty",
 			"revision": "3fb116b820352b7f0c281308a4d6250c22d94e27",
 			"revisionTime": "2018-08-30T10:17:45Z"
-		},
-		{
-			"checksumSHA1": "MlE3iO0btJSHnKRZbWvckwW42yI=",
-			"path": "github.com/takama/daemon",
-			"revision": "aa76b0035d1239b7bb3ae1bd84cd88ef2e0a1f1e",
-			"revisionTime": "2018-04-03T11:37:44Z"
 		}
 	],
 	"rootPath": "akita"

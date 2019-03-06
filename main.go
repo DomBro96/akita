@@ -15,71 +15,23 @@ import (
 )
 
 const (
-	//name        = "akita"
-	//description = "Akita: A Simple Key-Value Database"
-	webAddr     = "0.0.0.0:8990"
+	webAddr = "0.0.0.0:8990"
 )
 
-var dependencies = []string{"labstack.echo", "takama.daemon"}
-
-type Service struct {
-	//daemon.Daemon
+type Template struct {
+	templates *template.Template
 }
 
-func (service *Service) Manage() (string, error) {
-	//usage := "Usage: akita install | remove | start | stop | status"
-	//if len(os.Args) > 1 {
-	//	command := os.Args[1]
-	//	switch command {
-	//	case "install":
-	//		return service.Install()
-	//	case "remove":
-	//		return service.Remove()
-	//	case "start":
-	//		return service.Start()
-	//	case "stop":
-	//		return service.Stop()
-	//	case "status":
-	//		return service.Status()
-	//	default:
-	//		return usage, nil
-	//	}
-	//}
-	interrup := make(chan os.Signal, 1)
-	signal.Notify(interrup, os.Interrupt, os.Kill, syscall.SIGEMT)
-
-	go func() { // start akita listening
-		db.Sev.Start()
-	}()
-
-	if !db.Sev.IsMaster() {
-		go func() {
-			for {
-				db.Sev.DbSync()
-				time.Sleep(500 * time.Millisecond) // do sync request every half second
-			}
-		}()
-	}
-
-	select {
-	case <-interrup:
-		str := "Akita server was stopped. "
-		err := db.Sev.Close() // recycle resources
-		if err != nil {
-			str = "Akita server stop error: %s\n. "
-		} else {
-			signal.Stop(interrup)
-		}
-		return str, err
-	}
+func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	return t.templates.ExecuteTemplate(w, name, data)
 }
 
 // http://127.0.0.1:8990
-func (service *Service) WebUI(webAddr string) {
+func WebUI(webAddr string) {
 	e := echo.New()
 	// static path
 	e.Static("/", "static")
-
+	e.HideBanner = true
 	// Logger middleware
 	e.Use(middleware.Logger())
 
@@ -92,7 +44,7 @@ func (service *Service) WebUI(webAddr string) {
 	}
 	e.Renderer = t
 
-	service.webUIRouter(e)
+	webUIRouter(e)
 
 	//e.Logger.Fatal(e.Start(webAddr))
 	err := e.Start(webAddr)
@@ -100,38 +52,40 @@ func (service *Service) WebUI(webAddr string) {
 }
 
 // router
-func (service *Service) webUIRouter(e *echo.Echo) {
-	e.GET("/", service.webUIIndex)
+func webUIRouter(e *echo.Echo) {
+	e.GET("/", webUIIndex)
 }
 
 // webUI Index page
-func (service *Service) webUIIndex(c echo.Context) error {
+func webUIIndex(c echo.Context) error {
 	data := make(map[string]interface{})
-
 	return c.Render(http.StatusOK, "index.html", data)
 }
 
-type Template struct {
-	templates *template.Template
-}
-
-func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
-}
-
 func main() {
-	//srv, err := daemon.New(name, description, dependencies...)
-	//if err != nil {
-	//	common.Error.Fatalf("Akita service start error: %s\n", err)
-	//}
+	interrup := make(chan os.Signal, 1)
+	signal.Notify(interrup, os.Interrupt, os.Kill, syscall.SIGEMT)
 
-	service := &Service{}
-	status, err := service.Manage()
-	if err != nil {
-		common.Error.Fatalf(status, err)
+	go func() {
+		db.Sev.Start() // start akita listening
+	}()
+
+	if !db.Sev.IsMaster() {
+		go func() {
+			for {
+				db.Sev.DbSync()
+				time.Sleep(500 * time.Millisecond) // do sync request every half second
+			}
+		}()
 	}
 
 	// start webUI
-	go service.WebUI(webAddr)
-	common.Info.Println(status)
+	go WebUI(webAddr)
+
+	// 监听中断, 当未有中断时, 主线程在这里阻塞
+	select {
+	case <-interrup:
+		db.Sev.Close() // recycle resources
+		signal.Stop(interrup)
+	}
 }

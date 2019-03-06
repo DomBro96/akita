@@ -77,19 +77,16 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 		http.Error(ctx.Response(), "sorry, slaves server can not sync data", http.StatusBadRequest)
 		return nil
 	}
-	common.Info.Printf("accept sync request...\n")
 	reqBody := ctx.Request().Body
 	defer reqBody.Close()
 
 	offsetBuf, err := ioutil.ReadAll(reqBody)
-	common.Info.Printf("data length is %d\n", len(offsetBuf))
 	if err != nil {
 		http.Error(ctx.Response(), err.Error(), http.StatusBadRequest)
 		return err
 	}
 	syncOffset := &SyncOffset{}
 	err = proto.Unmarshal(offsetBuf, syncOffset)
-	common.Info.Println(syncOffset)
 	if err != nil {
 		common.Error.Printf("proto data unmarshal error: %s \n", err)
 		http.Error(ctx.Response(), err.Error(), http.StatusInternalServerError)
@@ -129,7 +126,7 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 	}
 	protoData, _ := proto.Marshal(syncData)
 	ctx.Response().Header().Set("content-type", "application/protobuf") // use protobuf format to transport data
-	if _, err = ctx.Response().Write(protoData); err != nil { // if response error, reply 500 error
+	if _, err = ctx.Response().Write(protoData); err != nil {           // if response error, reply 500 error
 		http.Error(ctx.Response(), err.Error(), http.StatusInternalServerError)
 	}
 	return nil

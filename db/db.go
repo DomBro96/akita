@@ -31,7 +31,7 @@ func OpenDB(path string) *DB {
 	}
 	dbFile, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
-		common.Error.Fatalf("Open data file error: %s\n", err)
+		common.Error.Fatalf("Open data file "+path+" error: %s\n", err)
 		return nil
 	}
 	fs, err := common.GetFileSize(dbFile)
@@ -187,7 +187,6 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 func (db *DB) Close() error {
 	err := db.dataFile.Close()
 	if err != nil {
-		common.Error.Printf("data file close err: %s\n", err)
 		return err
 	}
 	return nil

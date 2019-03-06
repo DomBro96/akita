@@ -1,5 +1,13 @@
 ### Quick Start
 
+#### download
+
+```
+go get -u github.com/DomBro96/akita
+                or
+git clone https://github.com/DomBro96/akita.git
+```
+
 #### before
 
 ```
@@ -9,8 +17,7 @@ fill in the configuration file $GOPATH/src/github.com/akita/conf/akita.ini
 #### install
 
 ```
-1. go get -u github.com/DomBro96/akita or git clone https://github.com/DomBro96/akita.git
-2. go build -o akita
+go build -o akita
 ```
 
 #### start server
@@ -20,10 +27,12 @@ fill in the configuration file $GOPATH/src/github.com/akita/conf/akita.ini
 2. ./akita
 ```
 
-#### stop server
+#### stop server (Temporary plan)
 
 ```
-kill -9 pid or ctrl + c
+kill -9 pid
+    or
+ctrl + c
 ```
 
 #### insert

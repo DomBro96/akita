@@ -1,0 +1,67 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "Y2MOwzNZfl4NRNDbLCZa6sgx7O0=",
+			"path": "github.com/golang/protobuf/proto",
+			"revision": "347cf4a86c1cb8d262994d8ef5924d4576c5b331",
+			"revisionTime": "2019-01-09T07:22:47Z"
+		},
+		{
+			"checksumSHA1": "iqWBA0GWNr+cwAdF2KVy1eq9mlU=",
+			"path": "github.com/golang/protobuf/protoc-gen-go",
+			"revision": "347cf4a86c1cb8d262994d8ef5924d4576c5b331",
+			"revisionTime": "2019-01-09T07:22:47Z"
+		},
+		{
+			"checksumSHA1": "NRH7X+Nbt2VmGAlolU/ghGehTPo=",
+			"path": "github.com/labstack/echo",
+			"revision": "3f8b45c8d0dd840198a6b24b3393e5ec553dcb85",
+			"revisionTime": "2018-12-05T16:13:48Z"
+		},
+		{
+			"checksumSHA1": "l/UJi2F4qKPOlUTO2RKHOY41BZc=",
+			"path": "github.com/labstack/echo/middleware",
+			"revision": "3f8b45c8d0dd840198a6b24b3393e5ec553dcb85",
+			"revisionTime": "2018-12-05T16:13:48Z"
+		},
+		{
+			"checksumSHA1": "MPuJHi9fgD6ghoXomiSPkmQ+N5M=",
+			"path": "github.com/labstack/gommon",
+			"revision": "7fd9f68ece0bcb1a905fac8f1549f0083f71c51b",
+			"revisionTime": "2018-11-10T20:33:03Z"
+		},
+		{
+			"checksumSHA1": "wU6PVQ8WWtivzAsfEkTYJOjND3o=",
+			"path": "github.com/labstack/gommon/bytes",
+			"revision": "7fd9f68ece0bcb1a905fac8f1549f0083f71c51b",
+			"revisionTime": "2018-11-10T20:33:03Z"
+		},
+		{
+			"checksumSHA1": "R6DzcBLEP0BONPpsyr+11N7xh5w=",
+			"path": "github.com/labstack/gommon/color",
+			"revision": "7fd9f68ece0bcb1a905fac8f1549f0083f71c51b",
+			"revisionTime": "2018-11-10T20:33:03Z"
+		},
+		{
+			"checksumSHA1": "iPlSnDjuur4cK1G/7mJM/7frIm4=",
+			"path": "github.com/labstack/gommon/random",
+			"revision": "7fd9f68ece0bcb1a905fac8f1549f0083f71c51b",
+			"revisionTime": "2018-11-10T20:33:03Z"
+		},
+		{
+			"checksumSHA1": "SEnjvwVyfuU2xBaOfXfwPD5MZqk=",
+			"path": "github.com/mattn/go-colorable",
+			"revision": "efa589957cd060542a26d2dd7832fd6a6c6c3ade",
+			"revisionTime": "2018-03-10T13:32:14Z"
+		},
+		{
+			"checksumSHA1": "GiVgQkx5acnq+JZtYiuHPlhHoso=",
+			"path": "github.com/mattn/go-isatty",
+			"revision": "3fb116b820352b7f0c281308a4d6250c22d94e27",
+			"revisionTime": "2018-08-30T10:17:45Z"
+		}
+	],
+	"rootPath": "akita"
+}

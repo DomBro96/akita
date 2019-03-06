@@ -1,0 +1,7 @@
+ERROR: 2019/03/05 19:10:03 server.go:199: Akita server start fail : http: Server closed
+ERROR: 2019/03/05 19:13:46 server.go:200: Akita server start fail : http: Server closed
+ERROR: 2019/03/06 11:13:31 db.go:34: Open data file error: open : no such file or directory
+ERROR: 2019/03/06 11:14:28 db.go:34: Open data file  error: open : no such file or directory
+ERROR: 2019/03/06 11:15:34 db.go:36: Open data file  error: open : no such file or directory
+ERROR: 2019/03/06 11:20:48 db.go:34: Open data file  error: open : no such file or directory
+ERROR: 2019/03/06 11:30:28 server.go:200: akita server start fail http: Server closed

@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package db;
+
+message SyncOffset {
+        int64 offset = 2;
+}

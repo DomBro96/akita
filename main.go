@@ -54,12 +54,26 @@ func WebUI(webAddr string) {
 // router
 func webUIRouter(e *echo.Echo) {
 	e.GET("/", webUIIndex)
+	e.GET("/search", webUISearch)
+	e.GET("/insert", webUIInsert)
 }
 
 // webUI Index page
 func webUIIndex(c echo.Context) error {
 	data := make(map[string]interface{})
 	return c.Render(http.StatusOK, "index.html", data)
+}
+
+// webUI Index page
+func webUISearch(c echo.Context) error {
+	data := make(map[string]interface{})
+	return c.Render(http.StatusOK, "search.html", data)
+}
+
+// webUI Index page
+func webUIInsert(c echo.Context) error {
+	data := make(map[string]interface{})
+	return c.Render(http.StatusOK, "insert.html", data)
 }
 
 func main() {

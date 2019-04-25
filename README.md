@@ -38,17 +38,17 @@ ctrl + c
 #### insert
 
 ```
-curl -X POST "http://master_intranet_ip:port/save" -F "file=@picture_path" -F "key=key1"
+curl -X POST "http://master_intranet_ip:port/akita/save" -F "file=@picture_path" -F "key=key1"
 ```
 
 #### seek
 
 ```
-curl -X GET "http://master_or_slave_intranet_ip:port/seek?key=key1"
+curl -X GET "http://master_or_slave_intranet_ip:port/akita/seek?key=key1"
 ```
 
 #### del
 
 ```
-curl -X GET "http://master_intranet_ip:port/del?key=key1"
+curl -X GET "http://master_intranet_ip:port/akita/del?key=key1"
 ```

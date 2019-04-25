@@ -54,7 +54,7 @@ func search(ctx echo.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusOK, "seek key: "+key+" fail. ")
 	}
-	return ctx.JSON(http.StatusOK, value)
+	return ctx.Blob(http.StatusOK, "image/jpeg", value)
 }
 
 func del(ctx echo.Context) error {

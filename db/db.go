@@ -65,10 +65,11 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 	if err != nil {
 		return err
 	}
-	for offset < length {
-		ksBuf := dataBuf[offset:(offset + common.KsByteLength)]
-		vsBuf := dataBuf[(offset + common.KsByteLength):(offset + common.KvsByteLength)]
-		flagBuf := dataBuf[(offset + common.KvsByteLength):(offset + common.KvsByteLength + common.FlagByteLength)]
+	bufOffset := int64(0)
+	for bufOffset < length {
+		ksBuf := dataBuf[bufOffset:(bufOffset + common.KsByteLength)]
+		vsBuf := dataBuf[(bufOffset + common.KsByteLength):(bufOffset + common.KvsByteLength)]
+		flagBuf := dataBuf[(bufOffset + common.KvsByteLength):(bufOffset + common.KvsByteLength + common.FlagByteLength)]
 
 		ks, err := common.ByteSliceToInt32(ksBuf)
 		if err != nil {
@@ -82,7 +83,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 		if err != nil {
 			return err
 		}
-		keyBuf := dataBuf[(offset + common.KvsByteLength + common.FlagByteLength):(offset + common.KvsByteLength + common.FlagByteLength + int64(ks))]
+		keyBuf := dataBuf[(bufOffset + common.KvsByteLength + common.FlagByteLength):(bufOffset + common.KvsByteLength + common.FlagByteLength + int64(ks))]
 		key := common.ByteSliceToString(keyBuf)
 		rs := common.KvsByteLength + common.FlagByteLength + int(ks) + int(vs)
 		if flag == common.DeleteFlag {
@@ -90,14 +91,12 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 		} else {
 			rs += common.CrcByteLength
 			ri := recordIndex{
-				offset: offset,
+				offset: offset+bufOffset,
 				size:   rs,
 			}
 			db.iTable.put(key, &ri)
 		}
-		db.lock.Lock()
-		offset += int64(rs)
-		db.lock.Unlock()
+		bufOffset += int64(rs)
 	}
 	return nil
 }
@@ -202,12 +201,12 @@ func (db *DB) WriteSyncData(dataBuf []byte) error {
 		common.Error.Printf("write sync data error: %s\n", err)
 		return err
 	}
+	db.size += length
+	db.lock.Unlock()
 	err = db.UpdateTable(offset, length)
 	if err != nil {
 		common.Error.Printf("update index table error: %s\n", err)
 		return err
 	}
-	db.size += length
-	db.lock.Unlock()
 	return nil
 }

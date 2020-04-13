@@ -4,7 +4,6 @@ import (
 	"akita/common"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 )
 
@@ -42,6 +41,7 @@ func OpenDB(path string) *DB {
 	db := &DB{
 		dataFile: dbFile,
 		size:     fs,
+		// todo need reload when the db is open ?
 		iTable:   newIndexTable(),
 	}
 	return db
@@ -52,12 +52,17 @@ func (db *DB) Reload() error {
 	db.lock.Lock()
 	length := db.size
 	db.lock.Unlock()
-	if length < common.KvsByteLength+common.FlagByteLength+common.CrcByteLength {
+	if length <= common.RecordHeaderByteLength {
 		return nil
 	}
-	var offset int64 = 0
-	err := db.UpdateTable(offset, length)
-	return err
+
+	complete := make(chan error)
+	go func() {
+		// will block
+		complete <- db.UpdateTable(0, length)
+	}()
+
+	return <-complete
 }
 
 func (db *DB) UpdateTable(offset int64, length int64) error {
@@ -69,7 +74,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 	for bufOffset < length {
 		ksBuf := dataBuf[bufOffset:(bufOffset + common.KsByteLength)]
 		vsBuf := dataBuf[(bufOffset + common.KsByteLength):(bufOffset + common.KvsByteLength)]
-		flagBuf := dataBuf[(bufOffset + common.KvsByteLength):(bufOffset + common.KvsByteLength + common.FlagByteLength)]
+		flagBuf := dataBuf[(bufOffset + common.KvsByteLength):(bufOffset + common.RecordHeaderByteLength)]
 
 		ks, err := common.ByteSliceToInt32(ksBuf)
 		if err != nil {
@@ -79,23 +84,23 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 		if err != nil {
 			return err
 		}
+		keyBuf := dataBuf[(bufOffset + common.RecordHeaderByteLength):(bufOffset + common.RecordHeaderByteLength + int64(ks))]
+		key := common.ByteSliceToString(keyBuf)
 		flag, err := common.ByteSliceToInt32(flagBuf)
 		if err != nil {
 			return err
 		}
-		keyBuf := dataBuf[(bufOffset + common.KvsByteLength + common.FlagByteLength):(bufOffset + common.KvsByteLength + common.FlagByteLength + int64(ks))]
-		key := common.ByteSliceToString(keyBuf)
-		rs := common.KvsByteLength + common.FlagByteLength + int(ks) + int(vs)
 		if flag == common.DeleteFlag {
 			db.iTable.remove(key)
-		} else {
-			rs += common.CrcByteLength
-			ri := recordIndex{
-				offset: offset+bufOffset,
-				size:   rs,
-			}
-			db.iTable.put(key, &ri)
+			continue
 		}
+
+		rs := common.RecordHeaderByteLength + int(ks) + int(vs) + common.CrcByteLength
+		ri := recordIndex{
+			offset: offset+bufOffset,
+			size:   rs,
+		}
+		db.iTable.put(key, &ri)
 		bufOffset += int64(rs)
 	}
 	return nil
@@ -113,17 +118,19 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 		common.Error.Printf("Turn byte slice to int32 error: %s\n", err)
 		return nil, err
 	}
-	valueBuf := recordBuf[(common.KvsByteLength + common.FlagByteLength + int64(ks)):(length - common.CrcByteLength)]
-	crcSrcBuf := recordBuf[0:(length - common.CrcByteLength)]
+
+	valueBuf := recordBuf[(common.RecordHeaderByteLength + int64(ks)):(length - common.CrcByteLength)]
 	recordCrcBuf := recordBuf[(length - common.CrcByteLength):length]
-	checkCrc32, err := common.ByteSliceToUint(recordCrcBuf)
+	recordCrc32, err := common.ByteSliceToUint(recordCrcBuf)
 	if err != nil {
 		common.Error.Printf("Turn byte slice to uint error: %s\n", err)
 		return nil, err
 	}
+
+	crcSrcBuf := recordBuf[0:(length - common.CrcByteLength)]
 	crc32 := common.CreateCrc32(crcSrcBuf)
-	if crc32 != checkCrc32 {
-		common.Warning.Printf("The data which offset is " + strconv.Itoa(int(offset)) + " has been modified, not safe. ")
+	if crc32 != recordCrc32 {
+		common.Warning.Printf("The data which offset: %v, length: %v has been modified, not safe. ", offset, length)
 		return nil, common.ErrDataHasBeenModified
 	}
 	return valueBuf, nil
@@ -143,13 +150,13 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, error) {
 	}
 	recordBuf = append(recordBuf, crcBuf...)
 	db.lock.Lock()
+	defer db.lock.Unlock()
 	recordLength, err := common.WriteBufToFile(db.dataFile, db.size, recordBuf)
 	if err != nil {
 		common.Error.Printf("Write data to file error: %s\n", err)
 		return 0, err
 	}
 	db.size += recordLength
-	defer db.lock.Unlock()
 	return recordLength, nil
 }
 
@@ -159,13 +166,13 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
 		return 0, err
 	}
 	db.lock.Lock()
+	defer db.lock.Unlock()
 	recordLength, err := common.WriteBufToFile(db.dataFile, db.size, recordBuf)
 	if err != nil {
 		common.Error.Printf("Write data to file error: %s\n", err)
 		return 0, err
 	}
 	db.size += recordLength
-	db.lock.Unlock()
 	return recordLength, nil
 }
 

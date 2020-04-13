@@ -3,6 +3,7 @@ package db
 import (
 	"akita/common"
 	"bytes"
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/labstack/echo"
 	"mime/multipart"
@@ -17,15 +18,16 @@ import (
 type Server struct {
 	master    string   // master ip
 	slaves    []string // slaves ip
-	dB        *DB
+	db        *DB
+	// TODO: need replace 'echo' with native http server
 	echo      *echo.Echo // echo server handle http request
 	rwLock    sync.RWMutex
 	notifiers map[string]chan struct{} // notifiers notify slaves can get data from
 }
 
 var (
-	Sev  *Server
-	port string
+	Sever *Server
+	port  string
 )
 
 func (s *Server) Insert(key string, src multipart.File, length int64) (bool, error) {
@@ -46,7 +48,7 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 		key:   keyBuf,
 		value: valueBuf,
 	}
-	db := s.dB
+	db := s.db
 	offset := db.size
 	errorChan := make(chan error)
 	lengthChan := make(chan int64)
@@ -68,39 +70,32 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 }
 
 func (s *Server) Seek(key string) ([]byte, error) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	db := s.dB
-	it := s.dB.iTable
+	db := s.db
+	it := s.db.iTable
 	ri := it.get(key)
 	if ri == nil {
 		return nil, nil
 	}
-	valueChan := make(chan []byte)
-	errChan := make(chan error)
-	go func(bc chan []byte, ec chan error) {
-		defer wg.Done()
+	data := make(chan []byte)
+	complete := make(chan error)
+	go func() {
 		value, err := db.ReadRecord(ri.offset, int64(ri.size))
-		bc <- value
-		ec <- err
+		data <- value
+		complete <- err
 		return
-	}(valueChan, errChan)
-	value := <-valueChan
-	err := <-errChan
-	wg.Wait()
+	}()
+	// will block
+	value := <-data
+	err := <-complete
 	if err != nil {
-		common.Error.Printf("Seek key: "+key+" failed:  %s \n", err)
+		common.Error.Printf("seek key: %s failed. err: %v \n", key, err)
 		return nil, err
 	}
 	return value, nil
 }
 
 func (s *Server) Delete(key string) (bool, int64, error) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	db := s.dB
-	it := db.iTable
-	ri := it.remove(key)
+	ri := s.db.iTable.remove(key)
 	if ri == nil {
 		return false, 0, nil
 	}
@@ -115,15 +110,14 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 		key:   keyBuf,
 		value: nil,
 	}
-	errChan := make(chan error)
+	complete := make(chan error)
 	go func(from int64, record *dataRecord) {
-		defer wg.Done()
-		_, err := db.WriteRecordNoCrc32(record)
-		errChan <- err
+		_, err := s.db.WriteRecordNoCrc32(record)
+		complete <- err
 		return
-	}(db.size, dr)
-	err := <-errChan
-	wg.Wait()
+	}(s.db.size, dr)
+
+	err := <-complete
 	if err != nil {
 		common.Error.Printf("Delete key: "+key+" failed: %s \n", err)
 		return false, 0, err
@@ -133,9 +127,9 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 }
 
 func (s *Server) DbSync() error { // sync update data
-	s.dB.lock.Lock()
-	offset := s.dB.size
-	s.dB.lock.Unlock()
+	s.db.lock.Lock()
+	offset := s.db.size
+	s.db.lock.Unlock()
 	syncOffset := &SyncOffset{
 		Offset: offset,
 	}
@@ -146,7 +140,7 @@ func (s *Server) DbSync() error { // sync update data
 	}
 	reader := bytes.NewReader(protoData)
 	hc := common.NewHttpClient(2000 * time.Millisecond)
-	url := "http://" + s.master + ":" + port + "/akita/syn"
+	url := fmt.Sprintf("%v%v:%v%v", "http://", s.master, port, "/akita/syn")
 	statusCode, data, err := hc.Post(url, "application/protobuf", reader)
 	if err != nil {
 		common.Error.Printf("sync request fail: %s\n", err)
@@ -163,8 +157,12 @@ func (s *Server) DbSync() error { // sync update data
 		return err
 	}
 	if syncData.Code != 0 {
-		err = s.dB.WriteSyncData(syncData.Data) // write sync data
-		return err
+		complete := make(chan error)
+		go func() {
+			err := s.db.WriteSyncData(syncData.Data) // write sync data
+			complete <- err
+		}()
+		return <-complete
 	}
 	return nil
 }
@@ -200,19 +198,21 @@ func (s *Server) Start() {
 
 func (s *Server) Close() { // close server, stop provide service
 	common.Info.Println("akita server stopping... ")
-	err := s.dB.Close()
+	err := s.db.Close()
 	if err != nil {
 		common.Error.Printf("akita server stop fail %s\n", err)
+		return
 	}
 	err = s.echo.Close()
 	if err != nil {
 		common.Error.Fatalf("akita server stop fail %s\n", err)
-	} else {
-		common.Info.Println("akita server stopped. ")
+		return
 	}
+	common.Info.Println("akita server stopped. ")
 }
 
 func init() {
+	// TODO: change the configuration from file reading to parameter reading, using flag
 	c := new(common.Config)
 	file, _ := exec.LookPath(os.Args[0])
 	dir := filepath.Dir(file)
@@ -225,16 +225,16 @@ func init() {
 	slave = strings.Replace(slave, "{", "", 1)
 	slave = strings.Replace(slave, "}", "", 1)
 	slaves := strings.Split(slave, ",")
-	Sev = &Server{
+	Sever = &Server{
 		master:    c.ConfMap["server.master"],
 		slaves:    slaves,
 		echo:      echo.New(),
-		dB:        OpenDB(c.ConfMap["db.datafile"]),
+		db:        OpenDB(c.ConfMap["db.datafile"]),
 		notifiers: make(map[string]chan struct{}),
 	}
 	errChan := make(chan error)
 	go func() {
-		err := Sev.dB.Reload()
+		err := Sever.db.Reload()
 		errChan <- err
 	}()
 	err := <-errChan
@@ -242,9 +242,9 @@ func init() {
 		common.Error.Fatalf("Reload data base erro: %s\n", err)
 	}
 	port = c.ConfMap["server.port"]
-	Sev.echo.HideBanner = true
-	Sev.echo.POST("/akita/save", save)
-	Sev.echo.GET("/akita/search", search)
-	Sev.echo.GET("/akita/del", del)
-	Sev.echo.POST("/akita/syn", syn)
+	Sever.echo.HideBanner = true
+	Sever.echo.POST("/akita/save", save)
+	Sever.echo.GET("/akita/search", search)
+	Sever.echo.GET("/akita/del", del)
+	Sever.echo.POST("/akita/syn", syn)
 }

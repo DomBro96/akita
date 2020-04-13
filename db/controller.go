@@ -10,7 +10,7 @@ import (
 )
 
 func save(ctx echo.Context) error {
-	if !Sev.IsMaster() {
+	if !Sever.IsMaster() {
 		return ctx.JSON(http.StatusBadRequest, "sorry this akita node isn't master node! ")
 	}
 	key := ctx.FormValue("key")
@@ -38,7 +38,7 @@ func save(ctx echo.Context) error {
 		common.Error.Printf("File open fail: %s\n", err)
 		return ctx.JSON(http.StatusOK, err)
 	}
-	_, err = Sev.Insert(key, src, length)
+	_, err = Sever.Insert(key, src, length)
 	if err != nil {
 		return ctx.JSON(http.StatusOK, "save key: "+key+" fail")
 	}
@@ -50,7 +50,7 @@ func search(ctx echo.Context) error {
 	if key == "" {
 		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
 	}
-	value, err := Sev.Seek(key)
+	value, err := Sever.Seek(key)
 	if err != nil {
 		return ctx.JSON(http.StatusOK, "seek key: "+key+" fail. ")
 	}
@@ -58,14 +58,14 @@ func search(ctx echo.Context) error {
 }
 
 func del(ctx echo.Context) error {
-	if !Sev.IsMaster() {
+	if !Sever.IsMaster() {
 		return ctx.JSON(http.StatusBadRequest, "sorry this akita node isn't master node! ")
 	}
 	key := ctx.QueryParam("key")
 	if key == "" {
 		return ctx.JSON(http.StatusOK, "key can not be empty!  ")
 	}
-	_, delOffset, err := Sev.Delete(key)
+	_, delOffset, err := Sever.Delete(key)
 	if err != nil {
 		return ctx.JSON(http.StatusOK, "delete key: "+key+"fail. ")
 	}
@@ -73,7 +73,7 @@ func del(ctx echo.Context) error {
 }
 
 func syn(ctx echo.Context) error { // deal with slaves sync request
-	if !Sev.IsMaster() {
+	if !Sever.IsMaster() {
 		http.Error(ctx.Response(), "sorry, slaves server can not sync data", http.StatusBadRequest)
 		return nil
 	}
@@ -93,18 +93,35 @@ func syn(ctx echo.Context) error { // deal with slaves sync request
 		return err
 	}
 	common.Info.Printf("request offset is %d\n", syncOffset.Offset)
-	data, err := Sev.dB.GetDataByOffset(syncOffset.Offset)
+
+	complete := make(chan error)
+	dataCh := make(chan []byte)
+	go func() {
+		data, err := Sever.db.GetDataByOffset(syncOffset.Offset)
+		dataCh <-data
+		complete <-err
+	}()
+	data := <-dataCh
+	err = <-complete
+
 	syncData := &SyncData{}
 	if err != nil {
 		if err == common.ErrNoDataUpdate {
 			notifier := make(chan struct{})
-			Sev.register(ctx.Request().Host, notifier)
+			Sever.register(ctx.Request().Host, notifier)
 			select {
 			case <-time.After(1000 * time.Millisecond):
 				syncData.Code = 0
 				syncData.Data = nil
 			case <-notifier:
-				data, err = Sev.dB.GetDataByOffset(syncOffset.Offset)
+				go func() {
+					data, err := Sever.db.GetDataByOffset(syncOffset.Offset)
+					dataCh <-data
+					complete <-err
+				}()
+				data = <-dataCh
+				err = <-complete
+
 				common.Info.Printf("the data length is %d\n", len(data))
 				if err != nil {
 					common.Error.Printf("get data by offset error :%s\n", err)

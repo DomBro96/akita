@@ -1,12 +1,15 @@
 package db
 
 import (
+	"akita/ahttp"
 	"akita/common"
+	"akita/logger"
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/golang/protobuf/proto"
-	"github.com/labstack/echo"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,27 +18,29 @@ import (
 	"time"
 )
 
-type Server struct {
+type Engine struct {
 	master    string   // master ip
 	slaves    []string // slaves ip
 	db        *DB
-	// TODO: need replace 'echo' with native http server
-	echo      *echo.Echo // echo server handle http request
 	rwLock    sync.RWMutex
 	notifiers map[string]chan struct{} // notifiers notify slaves can get data from
 }
 
 var (
-	Sever *Server
-	port  string
+	Eng  *Engine
+	Port string
 )
 
-func (s *Server) Insert(key string, src multipart.File, length int64) (bool, error) {
+func (e *Engine) GetDB() *DB {
+	return e.db
+}
+
+func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, error) {
 	keyBuf := common.StringToByteSlice(key)
 	valueBuf := make([]byte, length)
 	_, err := src.Read(valueBuf)
 	if err != nil {
-		common.Error.Printf("Insert key: "+key+" failed:  %s \n", err)
+		logger.Error.Printf("Insert key %v failed:  %v \n", key, err)
 		return false, err
 	}
 	ks := len(keyBuf)
@@ -48,7 +53,7 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 		key:   keyBuf,
 		value: valueBuf,
 	}
-	db := s.db
+	db := e.db
 	offset := db.size
 	errorChan := make(chan error)
 	lengthChan := make(chan int64)
@@ -59,19 +64,19 @@ func (s *Server) Insert(key string, src multipart.File, length int64) (bool, err
 	}(dr)
 
 	if err := <-errorChan; err != nil {
-		common.Error.Printf("Insert key: "+key+" failed:  %s \n", err)
+		logger.Error.Printf("Insert key: "+key+" failed:  %v \n", err)
 		return false, err
 	}
 	it := db.iTable
 	ri := &recordIndex{offset: offset, size: int(<-lengthChan)}
 	it.put(key, ri)
-	s.notify()
+	e.notify()
 	return true, nil
 }
 
-func (s *Server) Seek(key string) ([]byte, error) {
-	db := s.db
-	it := s.db.iTable
+func (e *Engine) Seek(key string) ([]byte, error) {
+	db := e.db
+	it := e.db.iTable
 	ri := it.get(key)
 	if ri == nil {
 		return nil, nil
@@ -88,14 +93,14 @@ func (s *Server) Seek(key string) ([]byte, error) {
 	value := <-data
 	err := <-complete
 	if err != nil {
-		common.Error.Printf("seek key: %s failed. err: %v \n", key, err)
+		logger.Error.Printf("seek key: %v failed. err: %v \n", key, err)
 		return nil, err
 	}
 	return value, nil
 }
 
-func (s *Server) Delete(key string) (bool, int64, error) {
-	ri := s.db.iTable.remove(key)
+func (e *Engine) Delete(key string) (bool, int64, error) {
+	ri := e.db.iTable.remove(key)
 	if ri == nil {
 		return false, 0, nil
 	}
@@ -112,54 +117,54 @@ func (s *Server) Delete(key string) (bool, int64, error) {
 	}
 	complete := make(chan error)
 	go func(from int64, record *dataRecord) {
-		_, err := s.db.WriteRecordNoCrc32(record)
+		_, err := e.db.WriteRecordNoCrc32(record)
 		complete <- err
 		return
-	}(s.db.size, dr)
+	}(e.db.size, dr)
 
 	err := <-complete
 	if err != nil {
-		common.Error.Printf("Delete key: "+key+" failed: %s \n", err)
+		logger.Error.Printf("Delete key: "+key+" failed: %v \n", err)
 		return false, 0, err
 	}
-	s.notify()
+	e.notify()
 	return true, ri.offset, nil
 }
 
-func (s *Server) DbSync() error { // sync update data
-	s.db.lock.Lock()
-	offset := s.db.size
-	s.db.lock.Unlock()
+func (e *Engine) DbSync() error { // sync update data
+	e.db.Lock()
+	offset := e.db.size
+	e.db.Unlock()
 	syncOffset := &SyncOffset{
 		Offset: offset,
 	}
 	protoData, err := proto.Marshal(syncOffset)
 	if err != nil {
-		common.Error.Printf("marshal data to proto error: %s\n", err)
+		logger.Error.Printf("marshal data to proto error: %v\n", err)
 		return err
 	}
 	reader := bytes.NewReader(protoData)
-	hc := common.NewHttpClient(2000 * time.Millisecond)
-	url := fmt.Sprintf("%v%v:%v%v", "http://", s.master, port, "/akita/syn")
+	hc := ahttp.NewHttpClient(2000 * time.Millisecond)
+	url := fmt.Sprintf("%v%v:%v%v", "http://", e.master, Port, "/akita/syn")
 	statusCode, data, err := hc.Post(url, "application/protobuf", reader)
 	if err != nil {
-		common.Error.Printf("sync request fail: %s\n", err)
+		logger.Error.Printf("sync request fail: %v\n", err)
 		return err
 	}
 	if statusCode != 200 {
-		common.Info.Printf("sync data from fail info : %s\n", err)
+		logger.Info.Printf("sync data from fail info : %v\n", err)
 		return err
 	}
 	syncData := &SyncData{}
 	err = proto.Unmarshal(data, syncData)
 	if err != nil {
-		common.Error.Printf("proto data unmarshal error: %s \n", err)
+		logger.Error.Printf("proto data unmarshal error: %v \n", err)
 		return err
 	}
 	if syncData.Code != 0 {
 		complete := make(chan error)
 		go func() {
-			err := s.db.WriteSyncData(syncData.Data) // write sync data
+			err := e.db.WriteSyncData(syncData.Data) // write sync data
 			complete <- err
 		}()
 		return <-complete
@@ -167,48 +172,54 @@ func (s *Server) DbSync() error { // sync update data
 	return nil
 }
 
-func (s *Server) IsMaster() bool { // judge server is master or not
+func (e *Engine) IsMaster() bool { // judge server is master or not
 	intranet, err := common.GetIntranetIp()
 	if err != nil {
-		common.Error.Fatalf("check your web environment， make sure your machine has intranet ip.")
+		logger.Error.Fatalf("check your web environment， make sure your machine has intranet ip.")
 	}
-	if intranet == s.master {
+	if intranet == e.master {
 		return true
 	}
 	return false
 }
 
-func (s *Server) notify() {
-	s.rwLock.Lock()
-	for host, notifier := range s.notifiers {
+func (e *Engine) notify() {
+	e.rwLock.Lock()
+	for host, notifier := range e.notifiers {
 		close(notifier)
-		delete(s.notifiers, host)
+		delete(e.notifiers, host)
 	}
-	s.rwLock.Unlock()
+	e.rwLock.Unlock()
 }
-func (s *Server) register(slaveHost string, notifier chan struct{}) {
-	s.rwLock.Lock()
-	s.notifiers[slaveHost] = notifier
-	s.rwLock.Unlock()
+func (e *Engine) Register(slaveHost string, notifier chan struct{}) {
+	e.rwLock.Lock()
+	e.notifiers[slaveHost] = notifier
+	e.rwLock.Unlock()
 }
-func (s *Server) Start() {
-	common.Info.Println("akita server starting... ")
-	s.echo.Start(":" + port)
+func (e *Engine) Start(server *http.Server) {
+	logger.Info.Println("akita server starting... ")
+	if err := server.ListenAndServe(); err != nil {
+		logger.Error.Fatalf("start http server error %v", err)
+	}
 }
 
-func (s *Server) Close() { // close server, stop provide service
-	common.Info.Println("akita server stopping... ")
-	err := s.db.Close()
-	if err != nil {
-		common.Error.Printf("akita server stop fail %s\n", err)
+func (e *Engine) Close(server *http.Server) { // close server, stop provide service
+
+	logger.Info.Println("akita server stopping... ")
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error.Printf("shut down http server error %v", err)
 		return
 	}
-	err = s.echo.Close()
+
+	err := e.db.Close()
 	if err != nil {
-		common.Error.Fatalf("akita server stop fail %s\n", err)
+		logger.Error.Printf("akita server stop fail %v\n", err)
 		return
 	}
-	common.Info.Println("akita server stopped. ")
+	logger.Info.Println("akita server stopped. ")
+	return
 }
 
 func init() {
@@ -225,26 +236,20 @@ func init() {
 	slave = strings.Replace(slave, "{", "", 1)
 	slave = strings.Replace(slave, "}", "", 1)
 	slaves := strings.Split(slave, ",")
-	Sever = &Server{
+	Eng = &Engine{
 		master:    c.ConfMap["server.master"],
 		slaves:    slaves,
-		echo:      echo.New(),
 		db:        OpenDB(c.ConfMap["db.datafile"]),
 		notifiers: make(map[string]chan struct{}),
 	}
 	errChan := make(chan error)
 	go func() {
-		err := Sever.db.Reload()
+		err := Eng.db.Reload()
 		errChan <- err
 	}()
 	err := <-errChan
 	if err != nil {
-		common.Error.Fatalf("Reload data base erro: %s\n", err)
+		logger.Error.Fatalf("Reload data base erro: %s\n", err)
 	}
-	port = c.ConfMap["server.port"]
-	Sever.echo.HideBanner = true
-	Sever.echo.POST("/akita/save", save)
-	Sever.echo.GET("/akita/search", search)
-	Sever.echo.GET("/akita/del", del)
-	Sever.echo.POST("/akita/syn", syn)
+	Port = c.ConfMap["server.Port"]
 }

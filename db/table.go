@@ -47,12 +47,12 @@ func (it *indexTable) get(key string) (ri *recordIndex) { // find record from in
 	return
 }
 
-func (it *indexTable) remove(key string) (ri *recordIndex) { // delete record from index table
+func (it *indexTable) remove(key string) *recordIndex { // delete record from index table
 	it.rwLock.Lock()
 	defer it.rwLock.Unlock()
-	if ri = it.table[key]; ri != nil {
+	if _, exists := it.table[key]; exists {
 		it.usage -= len(key) + recordIndexSize
 		delete(it.table, key)
 	}
-	return
+	return it.table[key]
 }

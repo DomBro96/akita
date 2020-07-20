@@ -1,12 +1,9 @@
 package main
 
 import (
-	"akita/common"
 	"akita/db"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
-	"html/template"
-	"io"
+	"akita/handler"
+	"flag"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,92 +11,41 @@ import (
 	"time"
 )
 
-const (
-	webAddr = "0.0.0.0:8990"
+var (
+	port = flag.String("port", "", "akita listening port.")
+	master = flag.String("master_addr", "", "master node ip address. ")
+	slaves = flag.String("slaves_addr", "", "slaves nodes ip address set. ")
+
 )
 
-type Template struct {
-	templates *template.Template
-}
-
-func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
-}
-
-// http://127.0.0.1:8990
-func WebUI(webAddr string) {
-	e := echo.New()
-	// static path
-	e.Static("/", "static")
-	e.HideBanner = true
-	// Logger middleware
-	e.Use(middleware.Logger())
-
-	// Recover middleware
-	e.Use(middleware.Recover())
-
-	// 注册模板
-	t := &Template{
-		templates: template.Must(template.ParseGlob("views/*.html")),
-	}
-	e.Renderer = t
-
-	webUIRouter(e)
-
-	//e.Logger.Fatal(e.Start(webAddr))
-	err := e.Start(webAddr)
-	common.Info.Println(err)
-}
-
-// router
-func webUIRouter(e *echo.Echo) {
-	e.GET("/", webUIIndex)
-	e.GET("/search", webUISearch)
-	e.GET("/insert", webUIInsert)
-}
-
-// webUI Index page
-func webUIIndex(c echo.Context) error {
-	data := make(map[string]interface{})
-	return c.Render(http.StatusOK, "index.html", data)
-}
-
-// webUI Index page
-func webUISearch(c echo.Context) error {
-	data := make(map[string]interface{})
-	return c.Render(http.StatusOK, "search.html", data)
-}
-
-// webUI Index page
-func webUIInsert(c echo.Context) error {
-	data := make(map[string]interface{})
-	return c.Render(http.StatusOK, "insert.html", data)
-}
-
 func main() {
-	interrup := make(chan os.Signal, 1)
-	signal.Notify(interrup, os.Interrupt, os.Kill, syscall.SIGEMT)
+
+	http.HandleFunc("/akita/save", handler.Save)
+	http.HandleFunc("/akita/search", handler.Search)
+	http.HandleFunc("/akita/del", handler.Del)
+	http.HandleFunc("/akita/syn", handler.Syn)
+
+	server := &http.Server{Addr: ":"+db.Port, Handler: nil}
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGEMT)
 
 	go func() {
-		db.Sev.Start() // start akita listening
+		db.Eng.Start(server) // start akita listening
 	}()
 
-	if !db.Sev.IsMaster() {
+	if !db.Eng.IsMaster() {
 		go func() {
 			for {
-				db.Sev.DbSync()
+				db.Eng.DbSync()
 				time.Sleep(500 * time.Millisecond) // do sync request every half second
 			}
 		}()
 	}
 
-	// start webUI
-	go WebUI(webAddr)
-
 	// 监听中断, 当未有中断时, 主线程在这里阻塞
 	select {
-	case <-interrup:
-		db.Sev.Close() // recycle resources
-		signal.Stop(interrup)
+	case <-interrupt:
+		db.Eng.Close(server) // recycle resources
+		signal.Stop(interrupt)
 	}
 }

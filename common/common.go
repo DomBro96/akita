@@ -1,9 +1,9 @@
 package common
 
 import (
+	"akita/ahttp"
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"net"
@@ -79,7 +79,7 @@ func CreateCrc32(buf []byte) uint32 {
 }
 
 func GetExternalIp() (string, error) {
-	hc := NewHttpClient(2000 * time.Millisecond)
+	hc := ahttp.NewHttpClient(2000 * time.Millisecond)
 	data, err := hc.Get("http://myexternalip.com/raw")
 	if err != nil {
 		return "", err
@@ -105,11 +105,3 @@ func GetIntranetIp() (string, error) {
 	return intranetIp, nil
 }
 
-func UnmarshalData(data []byte) (map[string]interface{}, error) {
-	m := make(map[string]interface{})
-	err := json.Unmarshal(data, &m)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
-}

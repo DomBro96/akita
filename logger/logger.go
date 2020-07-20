@@ -1,4 +1,4 @@
-package common
+package logger
 
 import (
 	"io"
@@ -6,6 +6,7 @@ import (
 	"os"
 )
 
+// TODO: opt log
 var (
 	Info    *log.Logger
 	Warning *log.Logger
@@ -21,3 +22,4 @@ func init() {
 	Warning = log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
 	Error = log.New(io.MultiWriter(file, os.Stderr), "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
+

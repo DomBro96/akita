@@ -1,15 +1,12 @@
 package common
 
 import (
-	"fmt"
 	"os"
 )
 
 func ReadFileToByte(src *os.File, offset int64, length int64) ([]byte, error) {
 	buff := make([]byte, length)
-	_, err := src.ReadAt(buff, offset)
-	if err != nil {
-		fmt.Printf("read file error: %s\n", err)
+	if _, err := src.ReadAt(buff, offset); err != nil {
 		return nil, err
 	}
 	return buff, nil

@@ -8,46 +8,53 @@ import (
 	"sync"
 )
 
+// DB kv database struct for akita.
 type DB struct {
-	sync.Mutex
-	dataFile *os.File    // data file
-	size     int64       // data file size / next insert offset
-	iTable   *indexTable // database index
+	sync.Mutex               // todo: should use block channel instead of lock?
+	dataFilePath string      // data file path
+	size         int64       // data file size / next insert offset
+	iTable       *indexTable // database index
 }
 
-func OpenDB(path string) *DB {
-	dir := filepath.Dir(path)
+// OpenDB New Object.
+func OpenDB(fPath string) *DB {
+	dir := filepath.Dir(fPath)
 	ok, err := common.FileIsExit(dir)
 	if err != nil {
 		logger.Error.Fatalf("Get data dir is exit error: %s\n", err)
-		return nil
 	}
 	if !ok {
-		err = os.Mkdir(dir, os.ModePerm)
-		if err != nil {
+		if err = os.Mkdir(dir, os.ModePerm); err != nil {
 			logger.Error.Fatalf("Make data file folder error: %s\n", err)
-			return nil
 		}
 	}
-	dbFile, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
+
+	// get dbFile size, and reload index
+	dbFile, err := os.OpenFile(fPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
-		logger.Error.Fatalf("Open data file "+path+" error: %s\n", err)
-		return nil
+		logger.Error.Fatalf("Open data file "+fPath+" error: %s\n", err)
 	}
+	defer dbFile.Close()
+
 	fs, err := common.GetFileSize(dbFile)
 	if err != nil {
 		logger.Error.Fatalf("Get data file size error: %s\n", err)
-		return nil
 	}
 	db := &DB{
-		dataFile: dbFile,
-		size:     fs,
-		iTable:   newIndexTable(),
+		dataFilePath: fPath,
+		size:         fs,
+		iTable:       newIndexTable(),
 	}
 	return db
 }
 
-// reload database index table
+func (db *DB) GetSize() int64 {
+	db.Lock()
+	defer db.Unlock()
+	return db.size
+}
+
+// Reload reload database index table.
 func (db *DB) Reload() error {
 	db.Lock()
 	length := db.size
@@ -65,11 +72,20 @@ func (db *DB) Reload() error {
 	return <-complete
 }
 
+// UpdateTable update db index table.
 func (db *DB) UpdateTable(offset int64, length int64) error {
-	dataBuf, err := common.ReadFileToByte(db.dataFile, offset, length)
+
+	dbFile, err := os.OpenFile(db.dataFilePath, os.O_RDONLY, 0644)
 	if err != nil {
 		return err
 	}
+	defer dbFile.Close()
+
+	dataBuf, err := common.ReadFileToByte(dbFile, offset, length)
+	if err != nil {
+		return err
+	}
+
 	bufOffset := int64(0)
 	for bufOffset < length {
 		ksBuf := dataBuf[bufOffset:(bufOffset + common.KsByteLength)]
@@ -97,7 +113,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 
 		rs := common.RecordHeaderByteLength + int(ks) + int(vs) + common.CrcByteLength
 		ri := recordIndex{
-			offset: offset+bufOffset,
+			offset: offset + bufOffset,
 			size:   rs,
 		}
 		db.iTable.put(key, &ri)
@@ -106,12 +122,20 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 	return nil
 }
 
+// ReadRecord read data to memery.
 func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
-	recordBuf, err := common.ReadFileToByte(db.dataFile, offset, length)
+	dbFile, err := os.OpenFile(db.dataFilePath, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+	defer dbFile.Close()
+
+	recordBuf, err := common.ReadFileToByte(dbFile, offset, length)
 	if err != nil {
 		logger.Error.Printf("Read data from file error: %s\n", err)
 		return nil, err
 	}
+
 	ksBuf := recordBuf[0:common.KsByteLength]
 	ks, err := common.ByteSliceToInt32(ksBuf)
 	if err != nil {
@@ -136,7 +160,7 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	return valueBuf, nil
 }
 
-// write a record to data file
+// WriteRecord write a record to data file.
 func (db *DB) WriteRecord(record *dataRecord) (int64, error) {
 	recordBuf, err := record.getRecordBuf()
 	if err != nil {
@@ -151,7 +175,13 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, error) {
 	recordBuf = append(recordBuf, crcBuf...)
 	db.Lock()
 	defer db.Unlock()
-	recordLength, err := common.WriteBufToFile(db.dataFile, db.size, recordBuf)
+	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
+	if err != nil {
+		return -1, err
+	}
+	defer dbFile.Close()
+
+	recordLength, err := common.WriteBufToFile(dbFile, db.size, recordBuf)
 	if err != nil {
 		logger.Error.Printf("Write data to file error: %s\n", err)
 		return 0, err
@@ -160,6 +190,7 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, error) {
 	return recordLength, nil
 }
 
+// WriteRecordNoCrc32 write a record to data file with no crc32.
 func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
 	recordBuf, err := record.getRecordBuf()
 	if err != nil {
@@ -167,7 +198,13 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
 	}
 	db.Lock()
 	defer db.Unlock()
-	recordLength, err := common.WriteBufToFile(db.dataFile, db.size, recordBuf)
+	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
+	if err != nil {
+		return -1, err
+	}
+	defer dbFile.Close()
+
+	recordLength, err := common.WriteBufToFile(dbFile, db.size, recordBuf)
 	if err != nil {
 		logger.Error.Printf("Write data to file error: %s\n", err)
 		return 0, err
@@ -176,40 +213,43 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
 	return recordLength, nil
 }
 
+// GetDataByOffset get data from db file offset.
 func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
-	db.Lock()
-	length := db.size - offset
-	db.Unlock()
+	length := db.GetSize() - offset
 	if length <= 0 {
 		return nil, common.ErrNoDataUpdate
 	}
-	data, err := common.ReadFileToByte(db.dataFile, offset, length)
+	dbFile, err := os.OpenFile(db.dataFilePath, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+	defer dbFile.Close()
+
+	data, err := common.ReadFileToByte(dbFile, offset, length)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
+// Close recycle some resource.
 func (db *DB) Close() error {
-	err := db.dataFile.Close()
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-// salve server write sync data
+// WriteSyncData salve server write sync data.
 func (db *DB) WriteSyncData(dataBuf []byte) error {
 	var offset int64
 	db.Lock()
+	defer db.Unlock()
 	offset = db.size
-	length, err := common.WriteBufToFile(db.dataFile, offset, dataBuf)
+	length, err := common.WriteBufToFile(db.dataFilePath, offset, dataBuf)
 	if err != nil {
 		logger.Error.Printf("write sync data error: %s\n", err)
 		return err
 	}
 	db.size += length
-	db.Unlock()
+
 	err = db.UpdateTable(offset, length)
 	if err != nil {
 		logger.Error.Printf("update index table error: %s\n", err)

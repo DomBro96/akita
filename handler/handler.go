@@ -5,12 +5,14 @@ import (
 	"akita/common"
 	"akita/db"
 	"akita/logger"
-	"github.com/golang/protobuf/proto"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/golang/protobuf/proto"
 )
 
+// Save handle insert data request.
 func Save(w http.ResponseWriter, req *http.Request) {
 	if !db.Eng.IsMaster() {
 		ahttp.WriteResponse(w, http.StatusUnauthorized, "sorry this akita node isn't master node! ")
@@ -37,7 +39,7 @@ func Save(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var length int64
-	if length = file.Size; length > 10*common.M {
+	if length = file.Size; length > 64*common.M {
 		logger.Error.Printf("Upload file too large: %v\n", length)
 		ahttp.WriteResponse(w, http.StatusBadRequest, "file is too large to save. ")
 		return
@@ -58,6 +60,7 @@ func Save(w http.ResponseWriter, req *http.Request) {
 	ahttp.WriteResponse(w, http.StatusOK, "save  key: "+key+" success! ")
 }
 
+// Search handle get data request.
 func Search(w http.ResponseWriter, req *http.Request) {
 	key := req.URL.Query()["key"][0]
 	if key == "" {
@@ -73,7 +76,8 @@ func Search(w http.ResponseWriter, req *http.Request) {
 	ahttp.WriteResponseWithContextType(w, http.StatusOK, "image/jpeg", value)
 }
 
-func Del(w http.ResponseWriter, req *http.Request)  {
+// Del handle delete data request.
+func Del(w http.ResponseWriter, req *http.Request) {
 	if !db.Eng.IsMaster() {
 		ahttp.WriteResponse(w, http.StatusUnauthorized, "sorry this akita node isn't master node! ")
 		return
@@ -86,13 +90,14 @@ func Del(w http.ResponseWriter, req *http.Request)  {
 	_, delOffset, err := db.Eng.Delete(key)
 	if err != nil {
 		logger.Error.Printf("Delete key %v fail: %v\n", key, err)
-		ahttp.WriteResponse(w, http.StatusInternalServerError, "delete key: "+key+" fail: " + err.Error())
+		ahttp.WriteResponse(w, http.StatusInternalServerError, "delete key: "+key+" fail: "+err.Error())
 		return
 	}
 	ahttp.WriteResponse(w, http.StatusOK, delOffset)
 }
 
-func Syn(w http.ResponseWriter, req *http.Request) { // deal with slaves sync request
+// Sync deal with slaves sync request.
+func Sync(w http.ResponseWriter, req *http.Request) {
 	if !db.Eng.IsMaster() {
 		ahttp.WriteResponse(w, http.StatusUnauthorized, "sorry this akita node isn't master node! ")
 		return
@@ -119,8 +124,8 @@ func Syn(w http.ResponseWriter, req *http.Request) { // deal with slaves sync re
 	dataCh := make(chan []byte)
 	go func() {
 		data, err := db.Eng.GetDB().GetDataByOffset(syncOffset.Offset)
-		dataCh <-data
-		complete <-err
+		dataCh <- data
+		complete <- err
 	}()
 	data := <-dataCh
 	err = <-complete
@@ -137,8 +142,8 @@ func Syn(w http.ResponseWriter, req *http.Request) { // deal with slaves sync re
 			case <-notifier:
 				go func() {
 					data, err := db.Eng.GetDB().GetDataByOffset(syncOffset.Offset)
-					dataCh <-data
-					complete <-err
+					dataCh <- data
+					complete <- err
 				}()
 				data = <-dataCh
 				err = <-complete
@@ -166,4 +171,3 @@ func Syn(w http.ResponseWriter, req *http.Request) { // deal with slaves sync re
 	// use protobuf format to transport data
 	ahttp.WriteResponseWithContextType(w, http.StatusOK, "application/protobuf", protoData)
 }
-

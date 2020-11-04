@@ -3,49 +3,63 @@ package main
 import (
 	"akita/db"
 	"akita/handler"
+	"akita/logger"
 	"flag"
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
+	"strings"
 	"time"
 )
 
 var (
-	port = flag.String("port", "", "akita listening port.")
-	master = flag.String("master_addr", "", "master node ip address. ")
-	slaves = flag.String("slaves_addr", "", "slaves nodes ip address set. ")
-
+	port         = flag.String("port", "3664", "akita listening port.")
+	master       = flag.String("master_addr", "", "master node ip address. ")
+	slaves       = flag.String("slaves_addr", "", "slaves nodes ip address set. ")
+	dataFilePath = flag.String("data_file", "/usr/local/akdata.dat", "akita data file path. ")
 )
 
 func main() {
 
-	http.HandleFunc("/akita/save", handler.Save)
-	http.HandleFunc("/akita/search", handler.Search)
-	http.HandleFunc("/akita/del", handler.Del)
-	http.HandleFunc("/akita/syn", handler.Syn)
+	http.HandleFunc("/akita/save/", handler.Save)
+	http.HandleFunc("/akita/search/", handler.Search)
+	http.HandleFunc("/akita/del/", handler.Del)
+	http.HandleFunc("/akita/sync/", handler.Sync)
 
-	server := &http.Server{Addr: ":"+db.Port, Handler: nil}
+	server := &http.Server{Addr: ":" + *port, Handler: nil}
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGEMT)
+	signal.Notify(interrupt, os.Interrupt, os.Kill)
 
 	go func() {
-		db.Eng.Start(server) // start akita listening
+		db.DefaultEngine().Start(server) // start akita listening
 	}()
 
-	if !db.Eng.IsMaster() {
+	if !db.DefaultEngine().IsMaster() {
 		go func() {
 			for {
-				db.Eng.DbSync()
+				db.DefaultEngine().DbSync()
 				time.Sleep(500 * time.Millisecond) // do sync request every half second
 			}
 		}()
 	}
 
-	// 监听中断, 当未有中断时, 主线程在这里阻塞
 	select {
 	case <-interrupt:
-		db.Eng.Close(server) // recycle resources
+		db.DefaultEngine().Close(server) // recycle resources
 		signal.Stop(interrupt)
 	}
+}
+
+func init() {
+	InitializeDefaultEngine(*master, strings.Split(*slaves, ","), *dataFilePath)
+	errChan := make(chan error)
+	go func() {
+		err := DefaultEngine().db.Reload()
+		errChan <- err
+	}()
+	err := <-errChan
+	if err != nil {
+		logger.Error.Fatalf("Reload data base erro: %s\n", err)
+	}
+	Port = c.ConfMap["server.Port"]
 }

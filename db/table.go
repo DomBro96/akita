@@ -8,7 +8,7 @@ import (
 type (
 	recordIndex struct {
 		offset int64 // record begin offset
-		size   int   // record size
+		size   int64 // record size
 	}
 
 	indexTable struct {

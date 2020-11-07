@@ -21,3 +21,10 @@ func TestDB_WriteRecord(t *testing.T) {
 
 	fmt.Println(dir)
 }
+
+func TestDB_OpenDB(t *testing.T) {
+	t.Log("testing...")
+	d := OpenDB("/usr/local/akdata/akita.dat")
+	t.Logf("db: %v.", d)
+	t.Log("testing end.")
+}

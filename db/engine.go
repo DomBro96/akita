@@ -85,7 +85,7 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 		return false, err
 	}
 	it := db.iTable
-	ri := &recordIndex{offset: <-offsetChan, size: int(<-lengthChan)}
+	ri := &recordIndex{offset: <-offsetChan, size: <-lengthChan}
 	it.put(key, ri)
 	e.notify()
 	return true, nil

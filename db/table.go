@@ -29,7 +29,8 @@ func newIndexTable() *indexTable {
 	}
 }
 
-func (it *indexTable) put(key string, newIndex *recordIndex) (oldIndex *recordIndex) { // insert record to index table
+// put insert record to index table.
+func (it *indexTable) put(key string, newIndex *recordIndex) (oldIndex *recordIndex) {
 	it.rwLock.Lock()
 	defer it.rwLock.Unlock()
 	oldIndex = it.table[key]
@@ -40,14 +41,16 @@ func (it *indexTable) put(key string, newIndex *recordIndex) (oldIndex *recordIn
 	return
 }
 
-func (it *indexTable) get(key string) (ri *recordIndex) { // find record from index table
+// find record from index table.
+func (it *indexTable) get(key string) (ri *recordIndex) {
 	it.rwLock.RLock()
 	defer it.rwLock.RUnlock()
 	ri = it.table[key]
 	return
 }
 
-func (it *indexTable) remove(key string) *recordIndex { // delete record from index table
+// delete record from index table.
+func (it *indexTable) remove(key string) *recordIndex {
 	it.rwLock.Lock()
 	defer it.rwLock.Unlock()
 	if _, exists := it.table[key]; exists {

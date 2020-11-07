@@ -51,15 +51,14 @@ func main() {
 }
 
 func init() {
-	InitializeDefaultEngine(*master, strings.Split(*slaves, ","), *dataFilePath)
-	errChan := make(chan error)
+	db.InitializeDefaultEngine(*master, strings.Split(*slaves, ","), *port, *dataFilePath)
+	compelete := make(chan error)
 	go func() {
-		err := DefaultEngine().db.Reload()
-		errChan <- err
+		err := db.DefaultEngine().GetDB().Reload()
+		compelete <- err
 	}()
-	err := <-errChan
+	err := <-compelete
 	if err != nil {
 		logger.Error.Fatalf("Reload data base erro: %s\n", err)
 	}
-	Port = c.ConfMap["server.Port"]
 }

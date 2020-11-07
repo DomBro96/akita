@@ -115,7 +115,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 		rs := common.RecordHeaderByteLength + int(ks) + int(vs) + common.CrcByteLength
 		ri := recordIndex{
 			offset: offset + bufOffset,
-			size:   rs,
+			size:   int64(rs),
 		}
 		db.iTable.put(key, &ri)
 		bufOffset += int64(rs)

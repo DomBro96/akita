@@ -51,7 +51,7 @@ func Save(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer src.Close()
-	_, err = db.Eng.Insert(key, src, length)
+	_, err = db.DefaultEngine().Insert(key, src, length)
 	if err != nil {
 		logger.Error.Printf("File save key %v fail: %v\n", key, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -67,7 +67,7 @@ func Search(w http.ResponseWriter, req *http.Request) {
 		ahttp.WriteResponse(w, http.StatusOK, "key can not be empty!  ")
 		return
 	}
-	value, err := db.Eng.Seek(key)
+	value, err := db.DefaultEngine().Seek(key)
 	if err != nil {
 		logger.Error.Printf("Seek key %v error %v", key, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -78,7 +78,7 @@ func Search(w http.ResponseWriter, req *http.Request) {
 
 // Del handle delete data request.
 func Del(w http.ResponseWriter, req *http.Request) {
-	if !db.Eng.IsMaster() {
+	if !db.DefaultEngine().IsMaster() {
 		ahttp.WriteResponse(w, http.StatusUnauthorized, "sorry this akita node isn't master node! ")
 		return
 	}
@@ -87,7 +87,7 @@ func Del(w http.ResponseWriter, req *http.Request) {
 		ahttp.WriteResponse(w, http.StatusOK, "key can not be empty!  ")
 		return
 	}
-	_, delOffset, err := db.Eng.Delete(key)
+	_, delOffset, err := db.DefaultEngine().Delete(key)
 	if err != nil {
 		logger.Error.Printf("Delete key %v fail: %v\n", key, err)
 		ahttp.WriteResponse(w, http.StatusInternalServerError, "delete key: "+key+" fail: "+err.Error())
@@ -98,7 +98,7 @@ func Del(w http.ResponseWriter, req *http.Request) {
 
 // Sync deal with slaves sync request.
 func Sync(w http.ResponseWriter, req *http.Request) {
-	if !db.Eng.IsMaster() {
+	if !db.DefaultEngine().IsMaster() {
 		ahttp.WriteResponse(w, http.StatusUnauthorized, "sorry this akita node isn't master node! ")
 		return
 	}
@@ -123,7 +123,7 @@ func Sync(w http.ResponseWriter, req *http.Request) {
 	complete := make(chan error)
 	dataCh := make(chan []byte)
 	go func() {
-		data, err := db.Eng.GetDB().GetDataByOffset(syncOffset.Offset)
+		data, err := db.DefaultEngine().GetDB().GetDataByOffset(syncOffset.Offset)
 		dataCh <- data
 		complete <- err
 	}()
@@ -134,14 +134,14 @@ func Sync(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		if err == common.ErrNoDataUpdate {
 			notifier := make(chan struct{})
-			db.Eng.Register(req.Host, notifier)
+			db.DefaultEngine().Register(req.Host, notifier)
 			select {
 			case <-time.After(1000 * time.Millisecond):
 				syncData.Code = 0
 				syncData.Data = nil
 			case <-notifier:
 				go func() {
-					data, err := db.Eng.GetDB().GetDataByOffset(syncOffset.Offset)
+					data, err := db.DefaultEngine().GetDB().GetDataByOffset(syncOffset.Offset)
 					dataCh <- data
 					complete <- err
 				}()

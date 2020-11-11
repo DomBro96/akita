@@ -16,7 +16,7 @@ type DB struct {
 	iTable       *indexTable // database index
 }
 
-// OpenDB New Object.
+// OpenDB create a db object with data file path..
 func OpenDB(fPath string) *DB {
 	dir := filepath.Dir(fPath)
 	ok, err := common.FileIsExit(dir)
@@ -161,12 +161,13 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	return valueBuf, nil
 }
 
-// WriteRecord write a record to data file.
+// WriteRecord write byte stream record to data file.
 func (db *DB) WriteRecord(record *dataRecord) (int64, int64, error) {
 	recordBuf, err := record.getRecordBuf()
 	if err != nil {
 		return 0, 0, err
 	}
+	// TODO: create a dataRecord's make crc32.
 	crc32 := common.CreateCrc32(recordBuf)
 	crcBuf, err := common.UintToByteSlice(crc32)
 	if err != nil {
@@ -192,7 +193,7 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, int64, error) {
 	return offset, recordLength, nil
 }
 
-// WriteRecordNoCrc32 write a record to data file with no crc32.
+// WriteRecordNoCrc32 write byte stream record but no crc32 to data file.
 func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
 	recordBuf, err := record.getRecordBuf()
 	if err != nil {
@@ -215,7 +216,7 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
 	return recordLength, nil
 }
 
-// GetDataByOffset get data from db file offset.
+// GetDataByOffset get byte stream from data file at offset.
 func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 	length := db.GetSyncSize() - offset
 	if length <= 0 {
@@ -239,7 +240,7 @@ func (db *DB) Close() error {
 	return nil
 }
 
-// WriteSyncData salve server write sync data.
+// WriteSyncData write byte stream data to data file.
 func (db *DB) WriteSyncData(dataBuf []byte) error {
 	db.Lock()
 	defer db.Unlock()

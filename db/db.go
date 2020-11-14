@@ -109,6 +109,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 		}
 		if flag == common.DeleteFlag {
 			db.iTable.remove(key)
+			bufOffset += common.RecordHeaderByteLength + int64(ks) + int64(vs)
 			continue
 		}
 
@@ -175,15 +176,16 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, int64, error) {
 		return 0, 0, err
 	}
 	recordBuf = append(recordBuf, crcBuf...)
-	db.Lock()
-	defer db.Unlock()
-	offset := db.size
+
 	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
 	if err != nil {
 		return 0, -1, err
 	}
 	defer dbFile.Close()
 
+	db.Lock()
+	defer db.Unlock()
+	offset := db.size
 	recordLength, err := common.WriteBufToFile(dbFile, offset, recordBuf)
 	if err != nil {
 		logger.Error.Printf("Write data to file error: %s\n", err)
@@ -199,14 +201,13 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	db.Lock()
-	defer db.Unlock()
 	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
 	if err != nil {
 		return -1, err
 	}
 	defer dbFile.Close()
-
+	db.Lock()
+	defer db.Unlock()
 	recordLength, err := common.WriteBufToFile(dbFile, db.size, recordBuf)
 	if err != nil {
 		logger.Error.Printf("Write data to file error: %s\n", err)
@@ -242,13 +243,13 @@ func (db *DB) Close() error {
 
 // WriteSyncData write byte stream data to data file.
 func (db *DB) WriteSyncData(dataBuf []byte) error {
-	db.Lock()
-	defer db.Unlock()
 	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer dbFile.Close()
+	db.Lock()
+	defer db.Unlock()
 	offset := db.size
 	length, err := common.WriteBufToFile(dbFile, offset, dataBuf)
 	if err != nil {

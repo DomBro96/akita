@@ -3,7 +3,9 @@ package db
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
+	"strconv"
 	"testing"
 )
 
@@ -216,4 +218,33 @@ func uintToByteSlice(u uint32) ([]byte, error) {
 	err := binary.Write(buf, binary.BigEndian, u)
 	bufByte := buf.Bytes()
 	return bufByte, err
+}
+
+func BenchmarkWriteRecord(b *testing.B) {
+	b.Log("bechmark write record.")
+	d := OpenDB("/usr/local/akdata/akita.dat")
+
+	keyPre := "benchmark"
+	for i := 0; i < b.N; i++ {
+		key := keyPre + strconv.Itoa(i)
+		value := make([]byte, i+1)
+		aktiaWriteRecord(d, key, value)
+	}
+}
+
+func aktiaWriteRecord(db *DB, key string, value []byte) {
+	keyBytes := []byte(key)
+	ks, vs := len(keyBytes), len(value)
+
+	record := &dataRecord{
+		dateHeader: &dataHeader{
+			Ks:   int32(ks),
+			Vs:   int32(vs),
+			Flag: 1,
+		},
+		key:   keyBytes,
+		value: value,
+	}
+	offset, size, err := db.WriteRecord(record)
+	fmt.Printf("bechmark write record =====> offset: %d, size: %d,  err:%s. \n", offset, size, err)
 }

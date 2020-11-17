@@ -53,9 +53,11 @@ func (it *indexTable) get(key string) (ri *recordIndex) {
 func (it *indexTable) remove(key string) *recordIndex {
 	it.rwLock.Lock()
 	defer it.rwLock.Unlock()
-	if _, exists := it.table[key]; exists {
+	if index, exists := it.table[key]; exists {
+		index = it.table[key]
 		it.usage -= len(key) + recordIndexSize
 		delete(it.table, key)
+		return index
 	}
-	return it.table[key]
+	return nil
 }

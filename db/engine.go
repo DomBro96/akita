@@ -152,7 +152,7 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 func (e *Engine) DbSync() error {
 
 	offset := e.db.GetSyncSize()
-	syncOffset := &SyncOffset{
+	syncOffset := &pb.SyncOffset{
 		Offset: offset,
 	}
 	protoData, err := proto.Marshal(syncOffset)
@@ -172,7 +172,7 @@ func (e *Engine) DbSync() error {
 		logger.Info.Printf("sync data from fail info : %v\n", err)
 		return err
 	}
-	syncData := &SyncData{}
+	syncData := 
 	err = proto.Unmarshal(data, syncData)
 	if err != nil {
 		logger.Error.Printf("proto data unmarshal error: %v \n", err)

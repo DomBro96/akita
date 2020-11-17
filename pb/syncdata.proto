@@ -1,0 +1,13 @@
+syntax = "proto3";
+option go_package = ".;pb";
+
+package pb;
+
+ message SyncData {
+   int32 Code = 8;
+   bytes Data = 7;
+ }
+
+ message SyncOffset {
+    int64 offset = 2;
+}

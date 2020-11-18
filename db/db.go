@@ -82,7 +82,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 	}
 	defer dbFile.Close()
 
-	dataBuf, err := common.ReadFileToByte(dbFile, offset, length)
+	dataBuf, err := common.ReadFileToBytes(dbFile, offset, length)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	}
 	defer dbFile.Close()
 
-	recordBuf, err := common.ReadFileToByte(dbFile, offset, length)
+	recordBuf, err := common.ReadFileToBytes(dbFile, offset, length)
 	if err != nil {
 		logger.Error.Printf("Read data from file error: %s\n", err)
 		return nil, err
@@ -164,18 +164,10 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 
 // WriteRecord write byte stream record to data file.
 func (db *DB) WriteRecord(record *dataRecord) (int64, int64, error) {
-	recordBuf, err := record.getRecordBuf()
+	recordBuf, err := record.getRecordBuf(true)
 	if err != nil {
 		return 0, 0, err
 	}
-	// TODO: create a dataRecord's make crc32.
-	crc32 := common.CreateCrc32(recordBuf)
-	crcBuf, err := common.UintToByteSlice(crc32)
-	if err != nil {
-		logger.Error.Printf("Turn uint to byte slice error: %s\n", err)
-		return 0, 0, err
-	}
-	recordBuf = append(recordBuf, crcBuf...)
 
 	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
 	if err != nil {
@@ -229,7 +221,7 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 	}
 	defer dbFile.Close()
 
-	data, err := common.ReadFileToByte(dbFile, offset, length)
+	data, err := common.ReadFileToBytes(dbFile, offset, length)
 	if err != nil {
 		return nil, err
 	}

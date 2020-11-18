@@ -38,7 +38,6 @@ func (it *indexTable) put(key string, newIndex *recordIndex) (oldIndex *recordIn
 	if oldIndex == nil {
 		it.usage += len(key) + recordIndexSize
 	}
-	return
 }
 
 // find record from index table.
@@ -54,7 +53,6 @@ func (it *indexTable) remove(key string) *recordIndex {
 	it.rwLock.Lock()
 	defer it.rwLock.Unlock()
 	if index, exists := it.table[key]; exists {
-		index = it.table[key]
 		it.usage -= len(key) + recordIndexSize
 		delete(it.table, key)
 		return index

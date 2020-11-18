@@ -1,47 +1,49 @@
 package common
 
 import (
-	"akita/ahttp"
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"hash/crc32"
 	"net"
 	"reflect"
-	"time"
 	"unsafe"
 )
 
+// ByteSliceToInt32 use big end way read bytes to int32
 func ByteSliceToInt32(bufByte []byte) (int32, error) {
 	buf := bytes.NewBuffer(bufByte)
 	var i int32
-	err := binary.Read(buf, binary.BigEndian, &i) // use big end way read bytes to int32
+	err := binary.Read(buf, binary.BigEndian, &i)
 	return i, err
 }
 
+// Int32ToByteSlice use big end way write int32 to bytes
 func Int32ToByteSlice(i int32) ([]byte, error) {
 	s1 := make([]byte, 0)
 	buf := bytes.NewBuffer(s1)
-	err := binary.Write(buf, binary.BigEndian, i) // use big end way write int32 to int32
+	err := binary.Write(buf, binary.BigEndian, i)
 	bufByte := buf.Bytes()
 	return bufByte, err
 }
 
+// UintToByteSlice use big end way write uint32 to bytes
 func UintToByteSlice(u uint32) ([]byte, error) {
 	s1 := make([]byte, 0)
 	buf := bytes.NewBuffer(s1)
-	err := binary.Write(buf, binary.BigEndian, u) // use big end way write uint32 to int32
+	err := binary.Write(buf, binary.BigEndian, u)
 	bufByte := buf.Bytes()
 	return bufByte, err
 }
 
+// ByteSliceToUint use big end way read bytes to uint32
 func ByteSliceToUint(bufByte []byte) (uint32, error) {
 	buf := bytes.NewBuffer(bufByte)
 	var u uint32
-	err := binary.Read(buf, binary.BigEndian, &u) // use big end way read bytes to uint32
+	err := binary.Read(buf, binary.BigEndian, &u)
 	return u, err
 }
 
+// StringToByteSlice using reflect pkg to convert string to byte slice
 func StringToByteSlice(str string) (buf []byte) {
 	if str == "" {
 		return nil
@@ -54,6 +56,7 @@ func StringToByteSlice(str string) (buf []byte) {
 	return
 }
 
+// ByteSliceToString using reflect pkg to convert byte slice to string
 func ByteSliceToString(buf []byte) (str string) {
 	if buf == nil {
 		return ""
@@ -65,6 +68,7 @@ func ByteSliceToString(buf []byte) (str string) {
 	return
 }
 
+// AppendByteSlice append all byte slice to a new byte slice
 func AppendByteSlice(bs ...[]byte) []byte {
 	buf := make([]byte, 0)
 	for _, b := range bs {
@@ -73,35 +77,24 @@ func AppendByteSlice(bs ...[]byte) []byte {
 	return buf
 }
 
+// CreateCrc32 call crc32.ChecksumIEEE
 func CreateCrc32(buf []byte) uint32 {
-	crcValue := crc32.ChecksumIEEE(buf)
-	return crcValue
+	return crc32.ChecksumIEEE(buf)
 }
 
-func GetExternalIp() (string, error) {
-	hc := ahttp.NewHttpClient(2000 * time.Millisecond)
-	data, err := hc.Get("http://myexternalip.com/raw")
-	if err != nil {
-		return "", err
-	}
-	str := ByteSliceToString(data)
-	fmt.Println(str)
-	return str, nil
-}
-
-func GetIntranetIp() (string, error) {
+// GetIntranetIP get current intranet ip address
+func GetIntranetIP() (string, error) {
 	adds, err := net.InterfaceAddrs()
 	if err != nil {
 		return "", err
 	}
-	var intranetIp string
+	var intranetIP string
 	for _, a := range adds {
 		if ipNet, ok := a.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
 			if ipNet.IP.To4() != nil {
-				intranetIp = ipNet.IP.String()
+				intranetIP = ipNet.IP.String()
 			}
 		}
 	}
-	return intranetIp, nil
+	return intranetIP, nil
 }
-

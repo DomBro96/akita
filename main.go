@@ -14,7 +14,7 @@ import (
 
 var (
 	port         = flag.String("port", "3664", "akita listening port.")
-	master       = flag.String("master_addr", "", "master node ip address. ")
+	master       = flag.String("master_addr", "localhost", "master node ip address. ")
 	slaves       = flag.String("slaves_addr", "", "slaves nodes ip address set. ")
 	dataFilePath = flag.String("data_file", "/usr/local/akdata.dat", "akita data file path. ")
 )

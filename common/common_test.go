@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-func TestByteSliceToInt(t *testing.T) {
-
-}
-
 func TestIntToByteSlice(t *testing.T) {
 	var i int32
 	i = 1024
@@ -81,12 +77,8 @@ func TestConfig_Read(t *testing.T) {
 	fmt.Println(s)
 }
 
-func TestGetExternalIp(t *testing.T) {
-	GetExternalIp()
-}
-
 func TestGetIntranetIp(t *testing.T) {
-	intranet, err := GetIntranetIp()
+	intranet, err := GetIntranetIP()
 	if err != nil {
 		fmt.Println(err)
 	}

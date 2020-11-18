@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	K                      = 1 << 11
-	M                      = 1 << 21
+	K                      = 1 << 10
+	M                      = 1 << 20
 	WriteFlag              = 1
 	DeleteFlag             = 2
 	KsByteLength           = 4

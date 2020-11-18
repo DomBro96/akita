@@ -5,6 +5,7 @@ import (
 	"akita/common"
 	"akita/db"
 	"akita/logger"
+	"akita/pb"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -14,7 +15,7 @@ import (
 
 // Save handle insert data request.
 func Save(w http.ResponseWriter, req *http.Request) {
-	if !db.Eng.IsMaster() {
+	if !db.DefaultEngine().IsMaster() {
 		ahttp.WriteResponse(w, http.StatusUnauthorized, "sorry this akita node isn't master node! ")
 		return
 	}
@@ -111,7 +112,7 @@ func Sync(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	syncOffset := &db.SyncOffset{}
+	syncOffset := &pb.SyncOffset{}
 	err = proto.Unmarshal(offsetBuf, syncOffset)
 	if err != nil {
 		logger.Error.Printf("proto data unmarshal error: %s \n", err)
@@ -130,7 +131,7 @@ func Sync(w http.ResponseWriter, req *http.Request) {
 	data := <-dataCh
 	err = <-complete
 
-	syncData := &db.SyncData{}
+	syncData := &pb.SyncData{}
 	if err != nil {
 		if err == common.ErrNoDataUpdate {
 			notifier := make(chan struct{})

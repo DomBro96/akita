@@ -4,6 +4,7 @@ import (
 	"akita/ahttp"
 	"akita/common"
 	"akita/logger"
+	"akita/pb"
 	"bytes"
 	"context"
 	"fmt"
@@ -172,7 +173,7 @@ func (e *Engine) DbSync() error {
 		logger.Info.Printf("sync data from fail info : %v\n", err)
 		return err
 	}
-	syncData := 
+	syncData := &pb.SyncData{}
 	err = proto.Unmarshal(data, syncData)
 	if err != nil {
 		logger.Error.Printf("proto data unmarshal error: %v \n", err)
@@ -193,21 +194,19 @@ func (e *Engine) DbSync() error {
 func (e *Engine) IsMaster() bool {
 	intranet, err := common.GetIntranetIp()
 	if err != nil {
-		logger.Error.Fatalf("check your web environment， make sure your machine has intranet ip.")
+		logger.Warning.Panicln("check your web environment， make sure your machine has intranet ip.")
 	}
-	if intranet == e.master {
-		return true
-	}
-	return false
+	return intranet == e.master
 }
 
 func (e *Engine) notify() {
 	e.Lock()
+	defer e.Unlock()
 	for host, notifier := range e.notifiers {
 		close(notifier)
 		delete(e.notifiers, host)
 	}
-	e.Unlock()
+
 }
 
 // Register regist slaves to master.
@@ -242,32 +241,4 @@ func (e *Engine) Close(server *http.Server) {
 		return
 	}
 	logger.Info.Println("akita server stopped. ")
-	return
 }
-
-// func init() {
-// 	// TODO: change the configuration from file reading to parameter reading, using flag
-// 	c := new(common.Config)
-// 	file, _ := exec.LookPath(os.Args[0])
-// 	dir := filepath.Dir(file)
-// 	absDir, _ := filepath.Abs(dir)
-// 	initFile := absDir + string(os.PathSeparator) + "conf" + string(os.PathSeparator) + "akita.ini"
-// 	abs, _ := filepath.Abs(initFile)
-// 	c.InitConfig(abs)
-// 	slave := c.ConfMap["server.slaves"]
-// 	slave = strings.TrimSpace(slave)
-// 	slave = strings.Replace(slave, "{", "", 1)
-// 	slave = strings.Replace(slave, "}", "", 1)
-// 	slaves := strings.Split(slave, ",")
-// 	InitializeDefaultEngine(c.ConfMap["server.master"], slaves, c.ConfMap["db.datafile"])
-// 	errChan := make(chan error)
-// 	go func() {
-// 		err := DefaultEngine().db.Reload()
-// 		errChan <- err
-// 	}()
-// 	err := <-errChan
-// 	if err != nil {
-// 		logger.Error.Fatalf("Reload data base erro: %s\n", err)
-// 	}
-// 	Port = c.ConfMap["server.Port"]
-// }

@@ -8,12 +8,6 @@ go get -u github.com/DomBro96/akita
 git clone https://github.com/DomBro96/akita.git
 ```
 
-#### before
-
-```
-fill in the configuration file $GOPATH/src/github.com/akita/conf/akita.ini
-```
-
 #### install
 
 ```
@@ -47,7 +41,7 @@ curl -X POST "http://master_intranet_ip:port/akita/save" -F "file=@picture_path"
 curl -X GET "http://master_or_slave_intranet_ip:port/akita/seek?key=key1"
 ```
 
-#### del
+#### delete
 
 ```
 curl -X GET "http://master_intranet_ip:port/akita/del?key=key1"

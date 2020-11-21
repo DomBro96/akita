@@ -4,7 +4,7 @@ import (
 	"os"
 )
 
-func ReadFileToByte(src *os.File, offset int64, length int64) ([]byte, error) {
+func ReadFileToBytes(src *os.File, offset int64, length int64) ([]byte, error) {
 	buff := make([]byte, length)
 	if _, err := src.ReadAt(buff, offset); err != nil {
 		return nil, err

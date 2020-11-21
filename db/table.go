@@ -38,6 +38,7 @@ func (it *indexTable) put(key string, newIndex *recordIndex) (oldIndex *recordIn
 	if oldIndex == nil {
 		it.usage += len(key) + recordIndexSize
 	}
+	return
 }
 
 // find record from index table.

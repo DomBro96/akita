@@ -98,3 +98,14 @@ func GetIntranetIP() (string, error) {
 	}
 	return intranetIP, nil
 }
+
+// HashCode similar to the hashcode method in java
+func HashCode(s string) int {
+	h := 0
+	if len(s) > 0 {
+		for i := 0; i < len(s); i++ {
+			h = 31*h + int(s[i])
+		}
+	}
+	return h
+}

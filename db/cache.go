@@ -120,10 +120,6 @@ func (l *hashTableLRUList) insert(n *hashTableLRUNode) {
 func (l *hashTableLRUList) remove(key string) {
 	l.Lock()
 	defer l.Unlock()
-	l.rm(key)
-}
-
-func (l *hashTableLRUList) rm(key string) {
 	bi := l.seekBucket(key)
 	cn := l.bucket[bi]
 	for cn.hNext != nil {

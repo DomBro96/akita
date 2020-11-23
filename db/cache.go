@@ -31,7 +31,7 @@ type (
 	}
 )
 
-// NewHashTableLRUList a factory func to create a hashTableLRUList obj
+// newHashTableLRUList a factory func to create a hashTableLRUList obj
 func newHashTableLRUList(l int) *hashTableLRUList {
 	lru := &hashTableLRUList{
 		head: &hashTableLRUNode{
@@ -59,7 +59,7 @@ func (l *hashTableLRUList) isEmpty() bool {
 }
 
 func (l *hashTableLRUList) isFull() bool {
-	return l.count == l.limit
+	return l.count >= l.limit
 }
 
 func (l *hashTableLRUList) search(key string) *hashTableLRUNode {
@@ -68,9 +68,9 @@ func (l *hashTableLRUList) search(key string) *hashTableLRUNode {
 	defer l.Unlock()
 	var n *hashTableLRUNode
 	cn := l.bucket[bi]
-	for cn != nil {
-		if cn.key == key {
-			n = cn
+	for cn.hNext != nil {
+		if cn.hNext.key == key {
+			n = cn.hNext
 			break
 		}
 		cn = cn.hNext
@@ -88,37 +88,55 @@ func (l *hashTableLRUList) search(key string) *hashTableLRUNode {
 func (l *hashTableLRUList) insert(n *hashTableLRUNode) {
 	l.Lock()
 	defer l.Unlock()
+
 	bi := l.seekBucket(n.key)
-	if l.bucket[bi] == nil {
-		l.bucket[bi] = n
-	} else {
-		cn := l.bucket[bi]
-		for cn.hNext != nil {
-			if cn.hNext.key == n.key {
-				l.usage -= hashTableLRUNodeSize + len(cn.hNext.data)
-				cn.hNext = cn.hNext.hNext
-			}
-			cn = cn.hNext
+	cn := l.bucket[bi]
+	for cn.hNext != nil {
+		if cn.hNext.key == n.key {
+			l.usage -= hashTableLRUNodeSize + len(n.key) + len(cn.hNext.data)
+			cn.hNext = cn.hNext.hNext
 		}
-		cn.hNext = n
+		cn = cn.hNext
 	}
+	cn.hNext = n
 
 	if l.isFull() {
 		tn := l.tail.pre
-		if tn != l.head {
-			pn := tn.pre
-			pn.next = l.tail
-			l.tail.pre = pn
-			l.usage -= hashTableLRUNodeSize + len(pn.data) + len(pn.key)
-		}
+		pn := tn.pre
+		pn.next = l.tail
+		l.tail.pre = pn
+		l.usage -= hashTableLRUNodeSize + len(pn.data) + len(pn.key)
 	}
 
+	hn := l.head.next
 	l.head.next = n
 	n.pre = l.head
-	l.tail.pre = n
-	n.next = l.tail
+	n.next = hn
+	hn.pre = n
+	l.usage += hashTableLRUNodeSize + len(n.data) + len(n.key)
+	l.count++
 }
 
-func (l *hashTableLRUList) delete(key string) *hashTableLRUNode {
-	return nil
+func (l *hashTableLRUList) remove(key string) {
+	l.Lock()
+	defer l.Unlock()
+	l.rm(key)
+}
+
+func (l *hashTableLRUList) rm(key string) {
+	bi := l.seekBucket(key)
+	cn := l.bucket[bi]
+	for cn.hNext != nil {
+		if cn.hNext.key == key {
+			dn := cn.hNext
+			pn := dn.pre
+			nn := dn.next
+			pn.next = nn
+			nn.pre = pn
+			cn.hNext = dn.hNext
+			l.count--
+			l.usage -= hashTableLRUNodeSize + len(dn.key) + len(dn.data)
+		}
+		cn = cn.hNext
+	}
 }

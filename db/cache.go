@@ -2,6 +2,7 @@ package db
 
 import (
 	"akita/common"
+	"fmt"
 	"sync"
 	"unsafe"
 )
@@ -47,6 +48,12 @@ func newHashTableLRUList(l int) *hashTableLRUList {
 	}
 	lru.head.next = lru.tail
 	lru.tail.pre = lru.head
+	for i := range lru.bucket {
+		lru.bucket[i] = &hashTableLRUNode{
+			key: fmt.Sprintf("bucket_head_%d", i),
+		}
+	}
+
 	return lru
 }
 
@@ -68,14 +75,19 @@ func (l *hashTableLRUList) search(key string) *hashTableLRUNode {
 	defer l.Unlock()
 	var n *hashTableLRUNode
 	cn := l.bucket[bi]
-	for cn.hNext != nil {
-		if cn.hNext.key == key {
-			n = cn.hNext
+	for cn != nil {
+		if cn.key == key {
+			n = cn
 			break
 		}
 		cn = cn.hNext
 	}
+
 	if n != nil {
+		prn := n.pre
+		nxn := n.next
+		prn.next = nxn
+		nxn.pre = prn
 		hn := l.head.next
 		hn.pre = n
 		n.next = hn
@@ -95,6 +107,10 @@ func (l *hashTableLRUList) insert(n *hashTableLRUNode) {
 		if cn.hNext.key == n.key {
 			l.usage -= hashTableLRUNodeSize + len(n.key) + len(cn.hNext.data)
 			cn.hNext = cn.hNext.hNext
+			prn := cn.pre
+			nxn := n.next
+			prn.next = nxn
+			nxn.pre = prn
 		}
 		cn = cn.hNext
 	}
@@ -109,10 +125,10 @@ func (l *hashTableLRUList) insert(n *hashTableLRUNode) {
 	}
 
 	hn := l.head.next
+	hn.pre = n
+	n.next = hn
 	l.head.next = n
 	n.pre = l.head
-	n.next = hn
-	hn.pre = n
 	l.usage += hashTableLRUNodeSize + len(n.data) + len(n.key)
 	l.count++
 }
@@ -125,14 +141,22 @@ func (l *hashTableLRUList) remove(key string) {
 	for cn.hNext != nil {
 		if cn.hNext.key == key {
 			dn := cn.hNext
-			pn := dn.pre
-			nn := dn.next
-			pn.next = nn
-			nn.pre = pn
+			prn := dn.pre
+			nxn := dn.next
+			prn.next = nxn
+			nxn.pre = prn
 			cn.hNext = dn.hNext
 			l.count--
 			l.usage -= hashTableLRUNodeSize + len(dn.key) + len(dn.data)
 		}
 		cn = cn.hNext
+	}
+}
+
+func (l *hashTableLRUList) traversePrint() {
+	cn := l.head
+	for cn != nil {
+		fmt.Println("key: ", cn.key)
+		cn = cn.next
 	}
 }

@@ -148,6 +148,7 @@ func (l *hashTableLRUList) remove(key string) {
 			cn.hNext = dn.hNext
 			l.count--
 			l.usage -= hashTableLRUNodeSize + len(dn.key) + len(dn.data)
+			break
 		}
 		cn = cn.hNext
 	}
@@ -156,7 +157,8 @@ func (l *hashTableLRUList) remove(key string) {
 func (l *hashTableLRUList) traversePrint() {
 	cn := l.head
 	for cn != nil {
-		fmt.Println("key: ", cn.key)
+		fmt.Printf("key: %s->", cn.key)
 		cn = cn.next
 	}
+	fmt.Println()
 }

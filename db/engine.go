@@ -192,7 +192,7 @@ func (e *Engine) DbSync() error {
 
 // IsMaster judge server is master or not.
 func (e *Engine) IsMaster() bool {
-	intranet, err := common.GetIntranetIp()
+	intranet, err := common.GetIntranetIP()
 	if err != nil {
 		logger.Warning.Panicln("check your web environment， make sure your machine has intranet ip.")
 	}
@@ -206,14 +206,13 @@ func (e *Engine) notify() {
 		close(notifier)
 		delete(e.notifiers, host)
 	}
-
 }
 
 // Register regist slaves to master.
 func (e *Engine) Register(slaveHost string, notifier chan struct{}) {
 	e.Lock()
+	defer e.Unlock()
 	e.notifiers[slaveHost] = notifier
-	e.Unlock()
 }
 
 // Start start akita server service.

@@ -75,9 +75,9 @@ func (l *hashTableLRUList) search(key string) *hashTableLRUNode {
 	defer l.Unlock()
 	var n *hashTableLRUNode
 	cn := l.bucket[bi]
-	for cn != nil {
-		if cn.key == key {
-			n = cn
+	for cn.hNext != nil {
+		if cn.hNext.key == key {
+			n = cn.hNext
 			break
 		}
 		cn = cn.hNext
@@ -161,4 +161,21 @@ func (l *hashTableLRUList) traversePrint() {
 		cn = cn.next
 	}
 	fmt.Println()
+}
+
+func (l *hashTableLRUList) removeAll() {
+	hn := l.head
+	tn := l.tail
+	l.Lock()
+	defer l.Unlock()
+	hn.next = tn
+	tn.pre = hn
+	l.bucket = make([]*hashTableLRUNode, hashTableBucketCap)
+	for i := range l.bucket {
+		l.bucket[i] = &hashTableLRUNode{
+			key: fmt.Sprintf("bucket_head_%d", i),
+		}
+	}
+	l.usage = 0
+	l.count = 0
 }

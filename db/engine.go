@@ -18,12 +18,14 @@ import (
 
 // Engine kv database engine.
 type Engine struct {
-	master string   // master ip
-	slaves []string // slaves ips
-	port   string
-	db     *DB
 	sync.RWMutex
+	master    string   // master ip
+	slaves    []string // slaves ips
+	port      string
+	db        *DB
 	notifiers map[string]chan struct{} // notifiers notify slaves can get data from
+	useCache  bool
+	cache     *hashTableLRUCache
 }
 
 var (
@@ -36,13 +38,17 @@ func DefaultEngine() *Engine {
 }
 
 // InitializeDefaultEngine init engine.
-func InitializeDefaultEngine(master string, slaves []string, port string, dataFilePath string) {
+func InitializeDefaultEngine(master string, slaves []string, port string, dataFilePath string, useCache bool, cacheLimit int) {
 	engine = &Engine{
 		master:    master,
 		slaves:    slaves,
 		port:      port,
 		db:        OpenDB(dataFilePath),
 		notifiers: make(map[string]chan struct{}),
+		useCache:  useCache,
+	}
+	if useCache {
+		engine.cache = newHashTableLRUCache(cacheLimit)
 	}
 }
 
@@ -89,11 +95,24 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 	ri := &recordIndex{offset: <-offsetChan, size: <-lengthChan}
 	it.put(key, ri)
 	e.notify()
+	if e.useCache {
+		cn := &hashTableLRUNode{
+			key:  key,
+			data: valueBuf,
+		}
+		e.cache.insert(cn)
+	}
 	return true, nil
 }
 
 // Seek get data from key.
 func (e *Engine) Seek(key string) ([]byte, error) {
+	if e.useCache {
+		cn := e.cache.search(key)
+		if cn != nil {
+			return cn.data, nil
+		}
+	}
 	db := e.db
 	it := e.db.iTable
 	ri := it.get(key)
@@ -113,6 +132,13 @@ func (e *Engine) Seek(key string) ([]byte, error) {
 	if err != nil {
 		logger.Error.Printf("seek key: %v failed. err: %v \n", key, err)
 		return nil, err
+	}
+	if e.useCache {
+		cn := &hashTableLRUNode{
+			key:  key,
+			data: value,
+		}
+		e.cache.insert(cn)
 	}
 	return value, nil
 }
@@ -146,6 +172,9 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 		return false, 0, err
 	}
 	e.notify()
+	if e.useCache {
+		e.cache.remove(key)
+	}
 	return true, ri.offset, nil
 }
 

@@ -9,7 +9,7 @@ import (
 
 const (
 	hashTableLRUNodeSize = int(unsafe.Sizeof(hashTableLRUNode{}))
-	hashTableBucketCap   = 31 // TODO: need to be optimized later
+	hashTableBucketCap   = 131
 )
 
 type (
@@ -21,7 +21,7 @@ type (
 		hNext *hashTableLRUNode // point to the next node when there is a hash conflict
 	}
 
-	hashTableLRUList struct {
+	hashTableLRUCache struct {
 		sync.RWMutex
 		head   *hashTableLRUNode
 		tail   *hashTableLRUNode
@@ -32,9 +32,9 @@ type (
 	}
 )
 
-// newHashTableLRUList a factory func to create a hashTableLRUList obj
-func newHashTableLRUList(l int) *hashTableLRUList {
-	lru := &hashTableLRUList{
+// newHashTableLRUCache a factory func to create a hashTableLRUList obj
+func newHashTableLRUCache(limit int) *hashTableLRUCache {
+	lru := &hashTableLRUCache{
 		head: &hashTableLRUNode{
 			key: "ak_cache_head",
 		},
@@ -43,7 +43,7 @@ func newHashTableLRUList(l int) *hashTableLRUList {
 		},
 		bucket: make([]*hashTableLRUNode, hashTableBucketCap),
 		usage:  0,
-		limit:  l,
+		limit:  limit,
 		count:  0,
 	}
 	lru.head.next = lru.tail
@@ -57,19 +57,19 @@ func newHashTableLRUList(l int) *hashTableLRUList {
 	return lru
 }
 
-func (l *hashTableLRUList) seekBucket(key string) int {
+func (l *hashTableLRUCache) seekBucket(key string) int {
 	return common.HashCode(key) % len(l.bucket)
 }
 
-func (l *hashTableLRUList) isEmpty() bool {
+func (l *hashTableLRUCache) isEmpty() bool {
 	return l.count == 0
 }
 
-func (l *hashTableLRUList) isFull() bool {
+func (l *hashTableLRUCache) isFull() bool {
 	return l.count >= l.limit
 }
 
-func (l *hashTableLRUList) search(key string) *hashTableLRUNode {
+func (l *hashTableLRUCache) search(key string) *hashTableLRUNode {
 	bi := l.seekBucket(key)
 	l.Lock()
 	defer l.Unlock()
@@ -97,7 +97,8 @@ func (l *hashTableLRUList) search(key string) *hashTableLRUNode {
 	return n
 }
 
-func (l *hashTableLRUList) insert(n *hashTableLRUNode) {
+// TODO: use key, value instead of n params.
+func (l *hashTableLRUCache) insert(n *hashTableLRUNode) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -133,7 +134,7 @@ func (l *hashTableLRUList) insert(n *hashTableLRUNode) {
 	l.count++
 }
 
-func (l *hashTableLRUList) remove(key string) {
+func (l *hashTableLRUCache) remove(key string) {
 	l.Lock()
 	defer l.Unlock()
 	bi := l.seekBucket(key)
@@ -154,7 +155,7 @@ func (l *hashTableLRUList) remove(key string) {
 	}
 }
 
-func (l *hashTableLRUList) traversePrint() {
+func (l *hashTableLRUCache) traversePrint() {
 	cn := l.head
 	for cn != nil {
 		fmt.Printf("key: %s->", cn.key)
@@ -163,7 +164,7 @@ func (l *hashTableLRUList) traversePrint() {
 	fmt.Println()
 }
 
-func (l *hashTableLRUList) removeAll() {
+func (l *hashTableLRUCache) removeAll() {
 	hn := l.head
 	tn := l.tail
 	l.Lock()

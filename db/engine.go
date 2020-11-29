@@ -96,11 +96,7 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 	it.put(key, ri)
 	e.notify()
 	if e.useCache {
-		cn := &hashTableLRUNode{
-			key:  key,
-			data: valueBuf,
-		}
-		e.cache.insert(cn)
+		e.cache.insert(key, valueBuf)
 	}
 	return true, nil
 }
@@ -134,11 +130,7 @@ func (e *Engine) Seek(key string) ([]byte, error) {
 		return nil, err
 	}
 	if e.useCache {
-		cn := &hashTableLRUNode{
-			key:  key,
-			data: value,
-		}
-		e.cache.insert(cn)
+		e.cache.insert(key, value)
 	}
 	return value, nil
 }

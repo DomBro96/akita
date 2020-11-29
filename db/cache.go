@@ -97,11 +97,13 @@ func (l *hashTableLRUCache) search(key string) *hashTableLRUNode {
 	return n
 }
 
-// TODO: use key, value instead of n params.
-func (l *hashTableLRUCache) insert(n *hashTableLRUNode) {
+func (l *hashTableLRUCache) insert(key string, data []byte) {
+	n := &hashTableLRUNode{
+		key:  key,
+		data: data,
+	}
 	l.Lock()
 	defer l.Unlock()
-
 	bi := l.seekBucket(n.key)
 	cn := l.bucket[bi]
 	for cn.hNext != nil {
@@ -165,18 +167,15 @@ func (l *hashTableLRUCache) traversePrint() {
 }
 
 func (l *hashTableLRUCache) removeAll() {
-	hn := l.head
-	tn := l.tail
 	l.Lock()
 	defer l.Unlock()
+	hn := l.head
+	tn := l.tail
 	hn.next = tn
 	tn.pre = hn
-	l.bucket = make([]*hashTableLRUNode, hashTableBucketCap)
-	for i := range l.bucket {
-		l.bucket[i] = &hashTableLRUNode{
-			key: fmt.Sprintf("bucket_head_%d", i),
-		}
-	}
 	l.usage = 0
 	l.count = 0
+	for i := range l.bucket {
+		l.bucket[i].hNext = nil
+	}
 }

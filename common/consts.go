@@ -4,6 +4,7 @@ import (
 	"errors"
 )
 
+// TODO move to other dir.
 const (
 	K                      = 1 << 10
 	M                      = 1 << 20

@@ -46,3 +46,21 @@ curl -X GET "http://master_or_slave_intranet_ip:port/akita/seek?key=key1"
 ```
 curl -X GET "http://master_intranet_ip:port/akita/del?key=key1"
 ```
+
+
+#### TODO list
+
+```
+1. Optimize the use of locks, such as reducing lock granularity and reducing lock contention
+
+2. Create a byte pool, reuse byte slices, reduce gc overhead
+
+3. Optimize code, such as server layer code and code structure
+
+4. Provide compact algorithms for data file
+
+5. AOF log
+
+6. client console
+
+```

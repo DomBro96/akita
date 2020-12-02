@@ -10,10 +10,11 @@ import (
 
 // DB kv database struct.
 type DB struct {
-	sync.Mutex               // todo: should use block channel instead of lock?
-	dataFilePath string      // data file path
-	size         int64       // data file size / next insert offset
-	iTable       *indexTable // database index
+	sync.Mutex             // todo: should use block channel instead of lock?
+	dfPath     string      // data file path
+	size       int64       // data file size / next insert offset
+	iTable     *indexTable // db index
+	rPipeline  chan []byte // rPipeline uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
 }
 
 // OpenDB create a db object with data file path..
@@ -41,9 +42,9 @@ func OpenDB(fPath string) *DB {
 		logger.Error.Fatalf("Get data file size error: %s\n", err)
 	}
 	db := &DB{
-		dataFilePath: fPath,
-		size:         fs,
-		iTable:       newIndexTable(),
+		dfPath: fPath,
+		size:   fs,
+		iTable: newIndexTable(),
 	}
 	return db
 }
@@ -76,7 +77,7 @@ func (db *DB) Reload() error {
 // UpdateTable update db index table.
 func (db *DB) UpdateTable(offset int64, length int64) error {
 
-	dbFile, err := os.OpenFile(db.dataFilePath, os.O_RDONLY, 0644)
+	dbFile, err := os.OpenFile(db.dfPath, os.O_RDONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -126,7 +127,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 
 // ReadRecord read data to memery.
 func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
-	dbFile, err := os.OpenFile(db.dataFilePath, os.O_RDONLY, 0644)
+	dbFile, err := os.OpenFile(db.dfPath, os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -169,12 +170,12 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, int64, error) {
 		return 0, 0, err
 	}
 
-	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
+	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 	if err != nil {
 		return 0, -1, err
 	}
 	defer dbFile.Close()
-
+	// avoid using locks in I/O operation.
 	db.Lock()
 	defer db.Unlock()
 	offset := db.size
@@ -189,11 +190,11 @@ func (db *DB) WriteRecord(record *dataRecord) (int64, int64, error) {
 
 // WriteRecordNoCrc32 write byte stream record but no crc32 to data file.
 func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
-	recordBuf, err := record.getRecordBuf()
+	recordBuf, err := record.getRecordBuf(false)
 	if err != nil {
 		return 0, err
 	}
-	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
+	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 	if err != nil {
 		return -1, err
 	}
@@ -215,7 +216,7 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 	if length <= 0 {
 		return nil, common.ErrNoDataUpdate
 	}
-	dbFile, err := os.OpenFile(db.dataFilePath, os.O_RDONLY, 0644)
+	dbFile, err := os.OpenFile(db.dfPath, os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +236,7 @@ func (db *DB) Close() error {
 
 // WriteSyncData write byte stream data to data file.
 func (db *DB) WriteSyncData(dataBuf []byte) error {
-	dbFile, err := os.OpenFile(db.dataFilePath, os.O_WRONLY, 0644)
+	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}

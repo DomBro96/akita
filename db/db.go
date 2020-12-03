@@ -42,9 +42,10 @@ func OpenDB(fPath string) *DB {
 		logger.Error.Fatalf("Get data file size error: %s\n", err)
 	}
 	db := &DB{
-		dfPath: fPath,
-		size:   fs,
-		iTable: newIndexTable(),
+		dfPath:    fPath,
+		size:      fs,
+		iTable:    newIndexTable(),
+		rPipeline: make(chan []byte, 1000),
 	}
 	return db
 }
@@ -257,4 +258,24 @@ func (db *DB) WriteSyncData(dataBuf []byte) error {
 		return err
 	}
 	return nil
+}
+
+// WriteRecordFromRPipline write the data to data file with channel.
+func (db *DB) WriteRecordFromRPipline() {
+
+	for {
+		select {
+		case r := <-db.rPipeline:
+			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
+			if err != nil {
+				continue
+			}
+			defer dbFile.Close()
+			recordLength, err := common.WriteBufToFile(dbFile, db.size, r)
+			if err != nil {
+				continue
+			}
+			db.size += recordLength
+		}
+	}
 }

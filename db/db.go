@@ -10,11 +10,12 @@ import (
 
 // DB kv database struct.
 type DB struct {
-	sync.Mutex             // todo: should use block channel instead of lock?
-	dfPath     string      // data file path
-	size       int64       // data file size / next insert offset
-	iTable     *indexTable // db index
-	rPipeline  chan []byte // rPipeline uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
+	sync.Mutex                 // todo: should use block channel instead of lock?
+	dfPath         string      // data file path
+	size           int64       // data file size / next insert offset
+	iTable         *indexTable // db index
+	rPipeline      chan []byte // rPipeline uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
+	rWriteComplete chan error  // rWriteComplete passing write record error
 }
 
 // OpenDB create a db object with data file path..
@@ -42,10 +43,11 @@ func OpenDB(fPath string) *DB {
 		logger.Error.Fatalf("Get data file size error: %s\n", err)
 	}
 	db := &DB{
-		dfPath:    fPath,
-		size:      fs,
-		iTable:    newIndexTable(),
-		rPipeline: make(chan []byte, 1000),
+		dfPath:         fPath,
+		size:           fs,
+		iTable:         newIndexTable(),
+		rPipeline:      make(chan []byte, 100),
+		rWriteComplete: make(chan error),
 	}
 	return db
 }
@@ -126,6 +128,46 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 	return nil
 }
 
+func (db *DB) UpdateTableWithData(offset int64, dataBuf []byte) error {
+
+	bufOffset, length := int64(0), int64(len(dataBuf))
+	for bufOffset < length {
+		ksBuf := dataBuf[bufOffset:(bufOffset + common.KsByteLength)]
+		vsBuf := dataBuf[(bufOffset + common.KsByteLength):(bufOffset + common.KvsByteLength)]
+		flagBuf := dataBuf[(bufOffset + common.KvsByteLength):(bufOffset + common.RecordHeaderByteLength)]
+
+		ks, err := common.ByteSliceToInt32(ksBuf)
+		if err != nil {
+			return err
+		}
+		vs, err := common.ByteSliceToInt32(vsBuf)
+		if err != nil {
+			return err
+		}
+		keyBuf := dataBuf[(bufOffset + common.RecordHeaderByteLength):(bufOffset + common.RecordHeaderByteLength + int64(ks))]
+		key := common.ByteSliceToString(keyBuf)
+		flag, err := common.ByteSliceToInt32(flagBuf)
+		if err != nil {
+			return err
+		}
+		if flag == common.DeleteFlag {
+			db.iTable.remove(key)
+			bufOffset += common.RecordHeaderByteLength + int64(ks) + int64(vs)
+			continue
+		}
+
+		rs := common.RecordHeaderByteLength + int(ks) + int(vs) + common.CrcByteLength
+		ri := recordIndex{
+			offset: offset + bufOffset,
+			size:   int64(rs),
+		}
+
+		db.iTable.put(key, &ri)
+		bufOffset += int64(rs)
+	}
+	return nil
+}
+
 // ReadRecord read data to memery.
 func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	dbFile, err := os.OpenFile(db.dfPath, os.O_RDONLY, 0644)
@@ -165,28 +207,21 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 }
 
 // WriteRecord write byte stream record to data file.
-func (db *DB) WriteRecord(record *dataRecord) (int64, int64, error) {
+func (db *DB) WriteRecord(record *dataRecord) error {
 	recordBuf, err := record.getRecordBuf(true)
 	if err != nil {
-		return 0, 0, err
+		return err
 	}
-
-	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
-	if err != nil {
-		return 0, -1, err
+	offsize := db.GetSyncSize()
+	db.SendRecordToRPipline(recordBuf)
+	if err = db.GetWriteRecordResult(); err != nil {
+		logger.Error.Printf("write record error: %v. \n", err)
+		return err
 	}
-	defer dbFile.Close()
-	// avoid using locks in I/O operation.
-	db.Lock()
-	defer db.Unlock()
-	offset := db.size
-	recordLength, err := common.WriteBufToFile(dbFile, offset, recordBuf)
-	if err != nil {
-		logger.Error.Printf("Write data to file error: %s\n", err)
-		return 0, 0, err
-	}
-	db.size += recordLength
-	return offset, recordLength, nil
+	it := db.iTable
+	ri := &recordIndex{offset: offsize, size: int64(len(recordBuf))}
+	it.put(string(record.key), ri)
+	return nil
 }
 
 // WriteRecordNoCrc32 write byte stream record but no crc32 to data file.
@@ -268,14 +303,29 @@ func (db *DB) WriteRecordFromRPipline() {
 		case r := <-db.rPipeline:
 			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 			if err != nil {
+				db.rWriteComplete <- err
 				continue
 			}
-			defer dbFile.Close()
 			recordLength, err := common.WriteBufToFile(dbFile, db.size, r)
 			if err != nil {
+				db.rWriteComplete <- err
 				continue
 			}
+			dbFile.Close()
+			db.Lock()
 			db.size += recordLength
+			db.Unlock()
+			db.rWriteComplete <- nil
 		}
 	}
+}
+
+// SendRecordToRPipline send records to rPipline
+func (db *DB) SendRecordToRPipline(r []byte) {
+	db.rPipeline <- r
+}
+
+// GetWriteRecordResult get write record error
+func (db *DB) GetWriteRecordResult() error {
+	return <-db.rWriteComplete
 }

@@ -76,16 +76,8 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 		key:   keyBuf,
 		value: valueBuf,
 	}
-	db := e.db
-	errorChan := make(chan error)
-	offsetChan := make(chan int64)
-	lengthChan := make(chan int64)
-	go func(record *dataRecord) {
-		offset, length, err := db.WriteRecord(record)
-		offsetChan <- offset
-		lengthChan <- length
-		errorChan <- err
-	}(dr)
+
+	offset, length, err := db.WriteRecord(dr)
 
 	if err := <-errorChan; err != nil {
 		logger.Error.Printf("Insert key: "+key+" failed:  %v \n", err)

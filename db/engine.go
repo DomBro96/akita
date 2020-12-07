@@ -76,16 +76,11 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 		key:   keyBuf,
 		value: valueBuf,
 	}
-
-	offset, length, err := db.WriteRecord(dr)
-
-	if err := <-errorChan; err != nil {
-		logger.Error.Printf("Insert key: "+key+" failed:  %v \n", err)
+	db := e.db
+	if err := db.WriteRecord(dr); err != nil {
+		logger.Error.Printf("Insert key %v failed:  %v \n", key, err)
 		return false, err
 	}
-	it := db.iTable
-	ri := &recordIndex{offset: <-offsetChan, size: <-lengthChan}
-	it.put(key, ri)
 	e.notify()
 	if e.useCache {
 		e.cache.insert(key, valueBuf)
@@ -129,6 +124,9 @@ func (e *Engine) Seek(key string) ([]byte, error) {
 
 // Delete delete data from key.
 func (e *Engine) Delete(key string) (bool, int64, error) {
+	if e.useCache {
+		e.cache.remove(key)
+	}
 	ri := e.db.iTable.remove(key)
 	if ri == nil {
 		return false, 0, nil
@@ -144,21 +142,13 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 		key:   keyBuf,
 		value: nil,
 	}
-	complete := make(chan error)
-	go func(from int64, record *dataRecord) {
-		_, err := e.db.WriteRecordNoCrc32(record)
-		complete <- err
-	}(e.db.size, dr)
 
-	err := <-complete
+	err := e.db.WriteRecordNoCrc32(dr)
 	if err != nil {
 		logger.Error.Printf("Delete key: "+key+" failed: %v \n", err)
 		return false, 0, err
 	}
 	e.notify()
-	if e.useCache {
-		e.cache.remove(key)
-	}
 	return true, ri.offset, nil
 }
 

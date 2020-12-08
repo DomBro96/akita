@@ -78,7 +78,7 @@ func (db *DB) Reload() error {
 	return <-complete
 }
 
-// UpdateTable update db index table.
+// UpdateTable update db index table from data file.
 func (db *DB) UpdateTable(offset int64, length int64) error {
 
 	dbFile, err := os.OpenFile(db.dfPath, os.O_RDONLY, 0644)
@@ -91,44 +91,10 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 	if err != nil {
 		return err
 	}
-
-	bufOffset := int64(0)
-	for bufOffset < length {
-		ksBuf := dataBuf[bufOffset:(bufOffset + common.KsByteLength)]
-		vsBuf := dataBuf[(bufOffset + common.KsByteLength):(bufOffset + common.KvsByteLength)]
-		flagBuf := dataBuf[(bufOffset + common.KvsByteLength):(bufOffset + common.RecordHeaderByteLength)]
-
-		ks, err := common.ByteSliceToInt32(ksBuf)
-		if err != nil {
-			return err
-		}
-		vs, err := common.ByteSliceToInt32(vsBuf)
-		if err != nil {
-			return err
-		}
-		keyBuf := dataBuf[(bufOffset + common.RecordHeaderByteLength):(bufOffset + common.RecordHeaderByteLength + int64(ks))]
-		key := common.ByteSliceToString(keyBuf)
-		flag, err := common.ByteSliceToInt32(flagBuf)
-		if err != nil {
-			return err
-		}
-		if flag == common.DeleteFlag {
-			db.iTable.remove(key)
-			bufOffset += common.RecordHeaderByteLength + int64(ks) + int64(vs)
-			continue
-		}
-
-		rs := common.RecordHeaderByteLength + int(ks) + int(vs) + common.CrcByteLength
-		ri := recordIndex{
-			offset: offset + bufOffset,
-			size:   int64(rs),
-		}
-		db.iTable.put(key, &ri)
-		bufOffset += int64(rs)
-	}
-	return nil
+	return db.UpdateTableWithData(offset, dataBuf)
 }
 
+// UpdateTableWithData update db index table with data buf.
 func (db *DB) UpdateTableWithData(offset int64, dataBuf []byte) error {
 
 	bufOffset, length := int64(0), int64(len(dataBuf))
@@ -260,27 +226,25 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 
 // Close recycle some resource.
 func (db *DB) Close() error {
+
+	close(db.rPipeline)
+	for k := range db.rWriteComplete {
+		close(db.rWriteComplete[k])
+		delete(db.rWriteComplete, k)
+	}
 	return nil
 }
 
 // WriteSyncData write byte stream data to data file.
 func (db *DB) WriteSyncData(dataBuf []byte) error {
-	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
-	if err != nil {
+	offset := db.GetSyncSize()
+	db.SendRecordToRPipline(dataBuf)
+	if err := db.GetWriteRecordResult(dataBuf); err != nil {
+		logger.Error.Printf("write sync data error: %v. \n", err)
 		return err
 	}
-	defer dbFile.Close()
-	db.Lock()
-	defer db.Unlock()
-	offset := db.size
-	length, err := common.WriteBufToFile(dbFile, offset, dataBuf)
-	if err != nil {
-		logger.Error.Printf("write sync data error: %s\n", err)
-		return err
-	}
-	db.size += length
 
-	err = db.UpdateTable(offset, length)
+	err := db.UpdateTableWithData(offset, dataBuf)
 	if err != nil {
 		logger.Error.Printf("update index table error: %s\n", err)
 		return err

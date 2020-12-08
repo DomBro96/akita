@@ -183,12 +183,7 @@ func (e *Engine) DbSync() error {
 		return err
 	}
 	if syncData.Code != 0 {
-		complete := make(chan error)
-		go func() {
-			err := e.db.WriteSyncData(syncData.Data) // write sync data
-			complete <- err
-		}()
-		return <-complete
+		return e.db.WriteSyncData(syncData.Data) // write sync data
 	}
 	return nil
 }
@@ -236,11 +231,6 @@ func (e *Engine) Close(server *http.Server) {
 		logger.Error.Printf("shut down http server error %v", err)
 		return
 	}
-
-	err := e.db.Close()
-	if err != nil {
-		logger.Error.Printf("akita server stop fail %v\n", err)
-		return
-	}
+	e.db.Close()
 	logger.Info.Println("akita server stopped. ")
 }

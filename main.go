@@ -63,4 +63,5 @@ func init() {
 	if err != nil {
 		logger.Error.Fatalf("Reload data base erro: %s\n", err)
 	}
+	go db.DefaultEngine().GetDB().WriteRecordFromRPipline()
 }

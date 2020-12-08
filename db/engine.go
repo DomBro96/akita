@@ -77,23 +77,10 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 		value: valueBuf,
 	}
 	db := e.db
-	errorChan := make(chan error)
-	offsetChan := make(chan int64)
-	lengthChan := make(chan int64)
-	go func(record *dataRecord) {
-		offset, length, err := db.WriteRecord(record)
-		offsetChan <- offset
-		lengthChan <- length
-		errorChan <- err
-	}(dr)
-
-	if err := <-errorChan; err != nil {
-		logger.Error.Printf("Insert key: "+key+" failed:  %v \n", err)
+	if err := db.WriteRecord(dr); err != nil {
+		logger.Error.Printf("Insert key %v failed:  %v \n", key, err)
 		return false, err
 	}
-	it := db.iTable
-	ri := &recordIndex{offset: <-offsetChan, size: <-lengthChan}
-	it.put(key, ri)
 	e.notify()
 	if e.useCache {
 		e.cache.insert(key, valueBuf)
@@ -137,6 +124,9 @@ func (e *Engine) Seek(key string) ([]byte, error) {
 
 // Delete delete data from key.
 func (e *Engine) Delete(key string) (bool, int64, error) {
+	if e.useCache {
+		e.cache.remove(key)
+	}
 	ri := e.db.iTable.remove(key)
 	if ri == nil {
 		return false, 0, nil
@@ -152,21 +142,13 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 		key:   keyBuf,
 		value: nil,
 	}
-	complete := make(chan error)
-	go func(from int64, record *dataRecord) {
-		_, err := e.db.WriteRecordNoCrc32(record)
-		complete <- err
-	}(e.db.size, dr)
 
-	err := <-complete
+	err := e.db.WriteRecordNoCrc32(dr)
 	if err != nil {
 		logger.Error.Printf("Delete key: "+key+" failed: %v \n", err)
 		return false, 0, err
 	}
 	e.notify()
-	if e.useCache {
-		e.cache.remove(key)
-	}
 	return true, ri.offset, nil
 }
 
@@ -201,12 +183,7 @@ func (e *Engine) DbSync() error {
 		return err
 	}
 	if syncData.Code != 0 {
-		complete := make(chan error)
-		go func() {
-			err := e.db.WriteSyncData(syncData.Data) // write sync data
-			complete <- err
-		}()
-		return <-complete
+		return e.db.WriteSyncData(syncData.Data) // write sync data
 	}
 	return nil
 }
@@ -254,11 +231,6 @@ func (e *Engine) Close(server *http.Server) {
 		logger.Error.Printf("shut down http server error %v", err)
 		return
 	}
-
-	err := e.db.Close()
-	if err != nil {
-		logger.Error.Printf("akita server stop fail %v\n", err)
-		return
-	}
+	e.db.Close()
 	logger.Info.Println("akita server stopped. ")
 }

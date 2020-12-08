@@ -3,6 +3,7 @@ package db
 import (
 	"akita/common"
 	"akita/logger"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -10,11 +11,12 @@ import (
 
 // DB kv database struct.
 type DB struct {
-	sync.Mutex             // todo: should use block channel instead of lock?
-	dfPath     string      // data file path
-	size       int64       // data file size / next insert offset
-	iTable     *indexTable // db index
-	rPipeline  chan []byte // rPipeline uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
+	sync.Mutex                           // todo: should use block channel instead of lock?
+	dfPath         string                // data file path
+	size           int64                 // data file size / next insert offset
+	iTable         *indexTable           // db index
+	rPipeline      chan []byte           // rPipeline uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
+	rWriteComplete map[string]chan error // rWriteComplete passing write record error
 }
 
 // OpenDB create a db object with data file path..
@@ -42,10 +44,11 @@ func OpenDB(fPath string) *DB {
 		logger.Error.Fatalf("Get data file size error: %s\n", err)
 	}
 	db := &DB{
-		dfPath:    fPath,
-		size:      fs,
-		iTable:    newIndexTable(),
-		rPipeline: make(chan []byte, 1000),
+		dfPath:         fPath,
+		size:           fs,
+		iTable:         newIndexTable(),
+		rPipeline:      make(chan []byte, 100),
+		rWriteComplete: make(map[string]chan error),
 	}
 	return db
 }
@@ -75,7 +78,7 @@ func (db *DB) Reload() error {
 	return <-complete
 }
 
-// UpdateTable update db index table.
+// UpdateTable update db index table from data file.
 func (db *DB) UpdateTable(offset int64, length int64) error {
 
 	dbFile, err := os.OpenFile(db.dfPath, os.O_RDONLY, 0644)
@@ -88,8 +91,13 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 	if err != nil {
 		return err
 	}
+	return db.UpdateTableWithData(offset, dataBuf)
+}
 
-	bufOffset := int64(0)
+// UpdateTableWithData update db index table with data buf.
+func (db *DB) UpdateTableWithData(offset int64, dataBuf []byte) error {
+
+	bufOffset, length := int64(0), int64(len(dataBuf))
 	for bufOffset < length {
 		ksBuf := dataBuf[bufOffset:(bufOffset + common.KsByteLength)]
 		vsBuf := dataBuf[(bufOffset + common.KsByteLength):(bufOffset + common.KvsByteLength)]
@@ -120,6 +128,7 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 			offset: offset + bufOffset,
 			size:   int64(rs),
 		}
+
 		db.iTable.put(key, &ri)
 		bufOffset += int64(rs)
 	}
@@ -165,50 +174,35 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 }
 
 // WriteRecord write byte stream record to data file.
-func (db *DB) WriteRecord(record *dataRecord) (int64, int64, error) {
+func (db *DB) WriteRecord(record *dataRecord) error {
 	recordBuf, err := record.getRecordBuf(true)
 	if err != nil {
-		return 0, 0, err
+		return err
 	}
-
-	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
-	if err != nil {
-		return 0, -1, err
+	offsize := db.GetSyncSize()
+	db.SendRecordToRPipline(recordBuf)
+	if err = db.GetWriteRecordResult(recordBuf); err != nil {
+		logger.Error.Printf("write record error: %v. \n", err)
+		return err
 	}
-	defer dbFile.Close()
-	// avoid using locks in I/O operation.
-	db.Lock()
-	defer db.Unlock()
-	offset := db.size
-	recordLength, err := common.WriteBufToFile(dbFile, offset, recordBuf)
-	if err != nil {
-		logger.Error.Printf("Write data to file error: %s\n", err)
-		return 0, 0, err
-	}
-	db.size += recordLength
-	return offset, recordLength, nil
+	it := db.iTable
+	ri := &recordIndex{offset: offsize, size: int64(len(recordBuf))}
+	it.put(string(record.key), ri)
+	return nil
 }
 
 // WriteRecordNoCrc32 write byte stream record but no crc32 to data file.
-func (db *DB) WriteRecordNoCrc32(record *dataRecord) (int64, error) {
+func (db *DB) WriteRecordNoCrc32(record *dataRecord) error {
 	recordBuf, err := record.getRecordBuf(false)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
-	if err != nil {
-		return -1, err
+	db.SendRecordToRPipline(recordBuf)
+	if err = db.GetWriteRecordResult(recordBuf); err != nil {
+		logger.Error.Printf("write record error: %v. \n", err)
+		return err
 	}
-	defer dbFile.Close()
-	db.Lock()
-	defer db.Unlock()
-	recordLength, err := common.WriteBufToFile(dbFile, db.size, recordBuf)
-	if err != nil {
-		logger.Error.Printf("Write data to file error: %s\n", err)
-		return 0, err
-	}
-	db.size += recordLength
-	return recordLength, nil
+	return nil
 }
 
 // GetDataByOffset get byte stream from data file at offset.
@@ -232,27 +226,25 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 
 // Close recycle some resource.
 func (db *DB) Close() error {
+
+	close(db.rPipeline)
+	for k := range db.rWriteComplete {
+		close(db.rWriteComplete[k])
+		delete(db.rWriteComplete, k)
+	}
 	return nil
 }
 
 // WriteSyncData write byte stream data to data file.
 func (db *DB) WriteSyncData(dataBuf []byte) error {
-	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
-	if err != nil {
+	offset := db.GetSyncSize()
+	db.SendRecordToRPipline(dataBuf)
+	if err := db.GetWriteRecordResult(dataBuf); err != nil {
+		logger.Error.Printf("write sync data error: %v. \n", err)
 		return err
 	}
-	defer dbFile.Close()
-	db.Lock()
-	defer db.Unlock()
-	offset := db.size
-	length, err := common.WriteBufToFile(dbFile, offset, dataBuf)
-	if err != nil {
-		logger.Error.Printf("write sync data error: %s\n", err)
-		return err
-	}
-	db.size += length
 
-	err = db.UpdateTable(offset, length)
+	err := db.UpdateTableWithData(offset, dataBuf)
 	if err != nil {
 		logger.Error.Printf("update index table error: %s\n", err)
 		return err
@@ -266,16 +258,38 @@ func (db *DB) WriteRecordFromRPipline() {
 	for {
 		select {
 		case r := <-db.rPipeline:
+			rwcKey := db.generateRwcKey(r)
+			db.rWriteComplete[rwcKey] = make(chan error)
 			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 			if err != nil {
+				db.rWriteComplete[rwcKey] <- err
 				continue
 			}
-			defer dbFile.Close()
 			recordLength, err := common.WriteBufToFile(dbFile, db.size, r)
 			if err != nil {
+				db.rWriteComplete[rwcKey] <- err
 				continue
 			}
+			dbFile.Close()
+			db.Lock()
 			db.size += recordLength
+			db.Unlock()
+			db.rWriteComplete[rwcKey] <- nil
 		}
 	}
+}
+
+// SendRecordToRPipline send records to rPipline
+func (db *DB) SendRecordToRPipline(r []byte) {
+	db.rPipeline <- r
+}
+
+// GetWriteRecordResult get write record error
+func (db *DB) GetWriteRecordResult(rf []byte) error {
+	rwcKey := db.generateRwcKey(rf)
+	return <-db.rWriteComplete[rwcKey]
+}
+
+func (db *DB) generateRwcKey(rf []byte) string {
+	return fmt.Sprintf("rwc:len:%d:val:%d", len(rf), common.CreateCrc32(rf))
 }

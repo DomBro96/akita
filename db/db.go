@@ -287,6 +287,7 @@ func (db *DB) SendRecordToRPipline(r []byte) {
 // GetWriteRecordResult get write record error
 func (db *DB) GetWriteRecordResult(rf []byte) error {
 	rwcKey := db.generateRwcKey(rf)
+	defer delete(db.rWriteComplete, rwcKey)
 	return <-db.rWriteComplete[rwcKey]
 }
 

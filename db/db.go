@@ -11,12 +11,12 @@ import (
 
 // DB kv database struct.
 type DB struct {
-	sync.Mutex                           // todo: should use block channel instead of lock?
-	dfPath         string                // data file path
-	size           int64                 // data file size / next insert offset
-	iTable         *indexTable           // db index
-	rPipeline      chan []byte           // rPipeline uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
-	rWriteComplete map[string]chan error // rWriteComplete passing write record error
+	sync.Mutex                            // todo: should use block channel instead of lock?
+	dfPath          string                // data file path
+	size            int64                 // data file size / next insert offset
+	iTable          *indexTable           // db index
+	recordQueue     chan []byte           // recordQueue uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
+	recordWriteErrs map[string]chan error // recordWriteErrs passing write record error
 }
 
 // OpenDB create a db object with data file path..
@@ -44,11 +44,11 @@ func OpenDB(fPath string) *DB {
 		logger.Error.Fatalf("Get data file size error: %s\n", err)
 	}
 	db := &DB{
-		dfPath:         fPath,
-		size:           fs,
-		iTable:         newIndexTable(),
-		rPipeline:      make(chan []byte, 100),
-		rWriteComplete: make(map[string]chan error),
+		dfPath:          fPath,
+		size:            fs,
+		iTable:          newIndexTable(),
+		recordQueue:     make(chan []byte, 100),
+		recordWriteErrs: make(map[string]chan error),
 	}
 	return db
 }
@@ -180,7 +180,7 @@ func (db *DB) WriteRecord(record *dataRecord) error {
 		return err
 	}
 	offsize := db.GetSyncSize()
-	db.SendRecordToRPipline(recordBuf)
+	db.PushRecordToQueue(recordBuf)
 	if err = db.GetWriteRecordResult(recordBuf); err != nil {
 		logger.Error.Printf("write record error: %v. \n", err)
 		return err
@@ -197,7 +197,7 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) error {
 	if err != nil {
 		return err
 	}
-	db.SendRecordToRPipline(recordBuf)
+	db.PushRecordToQueue(recordBuf)
 	if err = db.GetWriteRecordResult(recordBuf); err != nil {
 		logger.Error.Printf("write record error: %v. \n", err)
 		return err
@@ -226,19 +226,18 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 
 // Close recycle some resource.
 func (db *DB) Close() error {
-
-	close(db.rPipeline)
-	for k := range db.rWriteComplete {
-		close(db.rWriteComplete[k])
-		delete(db.rWriteComplete, k)
+	for k := range db.recordWriteErrs {
+		close(db.recordWriteErrs[k])
+		delete(db.recordWriteErrs, k)
 	}
+	close(db.recordQueue)
 	return nil
 }
 
 // WriteSyncData write byte stream data to data file.
 func (db *DB) WriteSyncData(dataBuf []byte) error {
 	offset := db.GetSyncSize()
-	db.SendRecordToRPipline(dataBuf)
+	db.PushRecordToQueue(dataBuf)
 	if err := db.GetWriteRecordResult(dataBuf); err != nil {
 		logger.Error.Printf("write sync data error: %v. \n", err)
 		return err
@@ -252,45 +251,46 @@ func (db *DB) WriteSyncData(dataBuf []byte) error {
 	return nil
 }
 
-// WriteRecordFromRPipline write the data to data file with channel.
-func (db *DB) WriteRecordFromRPipline() {
+// WriteFromRecordQueue write the data to data file with channel.
+func (db *DB) WriteFromRecordQueue() {
 
 	for {
 		select {
-		case r := <-db.rPipeline:
-			rwcKey := db.generateRwcKey(r)
-			db.rWriteComplete[rwcKey] = make(chan error)
+		case r := <-db.recordQueue:
+			rwcKey := db.generateRweKey(r)
+			db.recordWriteErrs[rwcKey] = make(chan error)
 			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 			if err != nil {
-				db.rWriteComplete[rwcKey] <- err
+				db.recordWriteErrs[rwcKey] <- err
 				continue
 			}
 			recordLength, err := common.WriteBufToFile(dbFile, db.size, r)
 			if err != nil {
-				db.rWriteComplete[rwcKey] <- err
+				db.recordWriteErrs[rwcKey] <- err
+				dbFile.Close()
 				continue
 			}
 			dbFile.Close()
 			db.Lock()
 			db.size += recordLength
 			db.Unlock()
-			db.rWriteComplete[rwcKey] <- nil
+			db.recordWriteErrs[rwcKey] <- nil
 		}
 	}
 }
 
-// SendRecordToRPipline send records to rPipline
-func (db *DB) SendRecordToRPipline(r []byte) {
-	db.rPipeline <- r
+// PushRecordToQueue send records to rPipline
+func (db *DB) PushRecordToQueue(r []byte) {
+	db.recordQueue <- r
 }
 
 // GetWriteRecordResult get write record error
 func (db *DB) GetWriteRecordResult(rf []byte) error {
-	rwcKey := db.generateRwcKey(rf)
-	defer delete(db.rWriteComplete, rwcKey)
-	return <-db.rWriteComplete[rwcKey]
+	rwcKey := db.generateRweKey(rf)
+	defer delete(db.recordWriteErrs, rwcKey)
+	return <-db.recordWriteErrs[rwcKey]
 }
 
-func (db *DB) generateRwcKey(rf []byte) string {
-	return fmt.Sprintf("rwc:len:%d:val:%d", len(rf), common.CreateCrc32(rf))
+func (db *DB) generateRweKey(rf []byte) string {
+	return fmt.Sprintf("rwe:len:%d:val:%d", len(rf), common.CreateCrc32(rf))
 }

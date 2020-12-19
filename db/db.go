@@ -11,12 +11,13 @@ import (
 
 // DB kv database struct.
 type DB struct {
-	sync.Mutex                            // todo: should use block channel instead of lock?
-	dfPath          string                // data file path
-	size            int64                 // data file size / next insert offset
-	iTable          *indexTable           // db index
-	recordQueue     chan []byte           // recordQueue uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
-	recordWriteErrs map[string]chan error // recordWriteErrs passing write record error
+	sync.Mutex                   // todo: should use block channel instead of lock?
+	dfPath          string       // data file path
+	size            int64        // data file size / next insert offset
+	iTable          *indexTable  // db index
+	recordQueue     chan []byte  // recordQueue uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
+	recordWriteErrs []chan error // recordWriteErrs passing write record error
+	rwErrIndex      int
 }
 
 // OpenDB create a db object with data file path..
@@ -48,7 +49,11 @@ func OpenDB(fPath string) *DB {
 		size:            fs,
 		iTable:          newIndexTable(),
 		recordQueue:     make(chan []byte, 100),
-		recordWriteErrs: make(map[string]chan error),
+		recordWriteErrs: make([]chan error, 100),
+		rwErrIndex:      0,
+	}
+	for i := range db.recordWriteErrs {
+		db.recordWriteErrs[i] = make(chan error)
 	}
 	return db
 }
@@ -181,7 +186,7 @@ func (db *DB) WriteRecord(record *dataRecord) error {
 	}
 	offsize := db.GetSyncSize()
 	db.PushRecordToQueue(recordBuf)
-	if err = db.GetWriteRecordResult(recordBuf); err != nil {
+	if err = db.GetWriteRecordResult(); err != nil {
 		logger.Error.Printf("write record error: %v. \n", err)
 		return err
 	}
@@ -198,7 +203,7 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) error {
 		return err
 	}
 	db.PushRecordToQueue(recordBuf)
-	if err = db.GetWriteRecordResult(recordBuf); err != nil {
+	if err = db.GetWriteRecordResult(); err != nil {
 		logger.Error.Printf("write record error: %v. \n", err)
 		return err
 	}
@@ -226,9 +231,8 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 
 // Close recycle some resource.
 func (db *DB) Close() error {
-	for k := range db.recordWriteErrs {
-		close(db.recordWriteErrs[k])
-		delete(db.recordWriteErrs, k)
+	for i := range db.recordWriteErrs {
+		close(db.recordWriteErrs[i])
 	}
 	close(db.recordQueue)
 	return nil
@@ -238,7 +242,7 @@ func (db *DB) Close() error {
 func (db *DB) WriteSyncData(dataBuf []byte) error {
 	offset := db.GetSyncSize()
 	db.PushRecordToQueue(dataBuf)
-	if err := db.GetWriteRecordResult(dataBuf); err != nil {
+	if err := db.GetWriteRecordResult(); err != nil {
 		logger.Error.Printf("write sync data error: %v. \n", err)
 		return err
 	}
@@ -257,16 +261,15 @@ func (db *DB) WriteFromRecordQueue() {
 	for {
 		select {
 		case r := <-db.recordQueue:
-			rwcKey := db.generateRweKey(r)
-			db.recordWriteErrs[rwcKey] = make(chan error)
+			i := db.rwErrIndex
 			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 			if err != nil {
-				db.recordWriteErrs[rwcKey] <- err
+				db.recordWriteErrs[i] <- err
 				continue
 			}
 			recordLength, err := common.WriteBufToFile(dbFile, db.size, r)
 			if err != nil {
-				db.recordWriteErrs[rwcKey] <- err
+				db.recordWriteErrs[i] <- err
 				dbFile.Close()
 				continue
 			}
@@ -274,21 +277,26 @@ func (db *DB) WriteFromRecordQueue() {
 			db.Lock()
 			db.size += recordLength
 			db.Unlock()
-			db.recordWriteErrs[rwcKey] <- nil
+			db.recordWriteErrs[i] <- nil
 		}
 	}
 }
 
-// PushRecordToQueue send records to rPipline
+// PushRecordToQueue send records to recordQueue
 func (db *DB) PushRecordToQueue(r []byte) {
 	db.recordQueue <- r
 }
 
 // GetWriteRecordResult get write record error
-func (db *DB) GetWriteRecordResult(rf []byte) error {
-	rwcKey := db.generateRweKey(rf)
-	defer delete(db.recordWriteErrs, rwcKey)
-	return <-db.recordWriteErrs[rwcKey]
+func (db *DB) GetWriteRecordResult() error {
+	i := db.rwErrIndex
+	err := <-db.recordWriteErrs[i]
+	if db.rwErrIndex < len(db.recordWriteErrs) {
+		db.rwErrIndex++
+	} else {
+		db.rwErrIndex = 0
+	}
+	return err
 }
 
 func (db *DB) generateRweKey(rf []byte) string {

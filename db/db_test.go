@@ -36,17 +36,16 @@ func Test_WriteRecord(t *testing.T) {
 		t.Errorf("record get buf error: %s.\n", err)
 		return
 	}
-	go func(db *DB) {
-		t.Logf("test write record from RPipline=====>  \n")
-		db.WriteRecordFromRPipline()
-	}(d)
 	t.Logf("test write record =====> record bytes len: %d. \n", len(recordBuf))
 
-	crc32 := crc32.ChecksumIEEE(recordBuf)
-
-	t.Logf("test write record =====> record bytes crc32: %d. \n", crc32)
+	go func(db *DB) {
+		t.Logf("test write record from RecordQueue=====>  \n")
+		db.WriteFromRecordQueue()
+	}(d)
 
 	err = d.WriteRecord(record)
+
+	t.Logf("test write record err : %v.\n", err)
 }
 
 func Test_WriteRecordNoCrc32(t *testing.T) {

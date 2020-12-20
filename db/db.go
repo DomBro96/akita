@@ -3,7 +3,6 @@ package db
 import (
 	"akita/common"
 	"akita/logger"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,13 +10,13 @@ import (
 
 // DB kv database struct.
 type DB struct {
-	sync.Mutex                   // todo: should use block channel instead of lock?
+	sync.Mutex
 	dfPath          string       // data file path
 	size            int64        // data file size / next insert offset
 	iTable          *indexTable  // db index
 	recordQueue     chan []byte  // recordQueue uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
 	recordWriteErrs []chan error // recordWriteErrs passing write record error
-	rwErrIndex      int
+	rwErrIndex      int          // rwErrIndex index of recordWriteErrs
 }
 
 // OpenDB create a db object with data file path..
@@ -297,8 +296,4 @@ func (db *DB) GetWriteRecordResult() error {
 		db.rwErrIndex = 0
 	}
 	return err
-}
-
-func (db *DB) generateRweKey(rf []byte) string {
-	return fmt.Sprintf("rwe:len:%d:val:%d", len(rf), common.CreateCrc32(rf))
 }

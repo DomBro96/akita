@@ -16,7 +16,7 @@ type DB struct {
 	iTable          *indexTable  // db index
 	recordQueue     chan []byte  // recordQueue uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
 	recordWriteErrs []chan error // recordWriteErrs passing write record error
-	rwErrIndex      int          // rwErrIndex index of recordWriteErrs
+	rwErrIndex      int          // rwErrIndex index of rec
 }
 
 // OpenDB create a db object with data file path..
@@ -91,21 +91,21 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 	}
 	defer dbFile.Close()
 
-	dataBuf, err := common.ReadFileToBytes(dbFile, offset, length)
+	dataBuff, err := common.ReadFileToBytes(dbFile, offset, length)
 	if err != nil {
 		return err
 	}
-	return db.UpdateTableWithData(offset, dataBuf)
+	return db.UpdateTableWithData(offset, dataBuff)
 }
 
 // UpdateTableWithData update db index table with data buf.
-func (db *DB) UpdateTableWithData(offset int64, dataBuf []byte) error {
+func (db *DB) UpdateTableWithData(offset int64, dataBuff []byte) error {
 
-	bufOffset, length := int64(0), int64(len(dataBuf))
+	bufOffset, length := int64(0), int64(len(dataBuff))
 	for bufOffset < length {
-		ksBuf := dataBuf[bufOffset:(bufOffset + common.KsByteLength)]
-		vsBuf := dataBuf[(bufOffset + common.KsByteLength):(bufOffset + common.KvsByteLength)]
-		flagBuf := dataBuf[(bufOffset + common.KvsByteLength):(bufOffset + common.RecordHeaderByteLength)]
+		ksBuf := dataBuff[bufOffset:(bufOffset + common.KsByteLength)]
+		vsBuf := dataBuff[(bufOffset + common.KsByteLength):(bufOffset + common.KvsByteLength)]
+		flagBuf := dataBuff[(bufOffset + common.KvsByteLength):(bufOffset + common.RecordHeaderByteLength)]
 
 		ks, err := common.ByteSliceToInt32(ksBuf)
 		if err != nil {
@@ -115,7 +115,7 @@ func (db *DB) UpdateTableWithData(offset int64, dataBuf []byte) error {
 		if err != nil {
 			return err
 		}
-		keyBuf := dataBuf[(bufOffset + common.RecordHeaderByteLength):(bufOffset + common.RecordHeaderByteLength + int64(ks))]
+		keyBuf := dataBuff[(bufOffset + common.RecordHeaderByteLength):(bufOffset + common.RecordHeaderByteLength + int64(ks))]
 		key := common.ByteSliceToString(keyBuf)
 		flag, err := common.ByteSliceToInt32(flagBuf)
 		if err != nil {
@@ -238,15 +238,15 @@ func (db *DB) Close() error {
 }
 
 // WriteSyncData write byte stream data to data file.
-func (db *DB) WriteSyncData(dataBuf []byte) error {
+func (db *DB) WriteSyncData(dataBuff []byte) error {
 	offset := db.GetSyncSize()
-	db.PushRecordToQueue(dataBuf)
+	db.PushRecordToQueue(dataBuff)
 	if err := db.GetWriteRecordResult(); err != nil {
 		logger.Error.Printf("write sync data error: %v. \n", err)
 		return err
 	}
 
-	err := db.UpdateTableWithData(offset, dataBuf)
+	err := db.UpdateTableWithData(offset, dataBuff)
 	if err != nil {
 		logger.Error.Printf("update index table error: %s\n", err)
 		return err
@@ -290,7 +290,7 @@ func (db *DB) PushRecordToQueue(r []byte) {
 func (db *DB) GetWriteRecordResult() error {
 	i := db.rwErrIndex
 	err := <-db.recordWriteErrs[i]
-	if db.rwErrIndex < len(db.recordWriteErrs) {
+	if db.rwErrIndex < len(db.recordWriteErrs)-1 {
 		db.rwErrIndex++
 	} else {
 		db.rwErrIndex = 0

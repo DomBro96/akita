@@ -51,7 +51,7 @@ curl -X GET "http://master_intranet_ip:port/akita/del?key=key1"
 #### TODO list
 
 ```
-1. Optimize the use of locks, such as reducing lock granularity and reducing lock contention
+1. ~Optimize the use of locks, such as reducing lock granularity and reducing lock contention~
 
 2. Create a byte pool, reuse byte slices, reduce gc overhead
 

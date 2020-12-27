@@ -260,7 +260,6 @@ func (db *DB) WriteFromRecordQueue() {
 	for {
 		select {
 		case r := <-db.recordQueue:
-			db.Lock()
 			i := db.rwErrIndex
 			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 			if err != nil {

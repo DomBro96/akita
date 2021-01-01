@@ -29,16 +29,17 @@ type Engine struct {
 }
 
 var (
+	bp     *common.BytePool
 	engine *Engine
 )
 
-// DefaultEngine get singletone engine.
-func DefaultEngine() *Engine {
+// GetEngine get singletone engine.
+func GetEngine() *Engine {
 	return engine
 }
 
-// InitializeDefaultEngine init engine.
-func InitializeDefaultEngine(master string, slaves []string, port string, dataFilePath string, useCache bool, cacheLimit int) {
+// InitializeEngine init engine.
+func InitializeEngine(master string, slaves []string, port string, dataFilePath string, useCache bool, cacheLimit int) {
 	engine = &Engine{
 		master:    master,
 		slaves:    slaves,

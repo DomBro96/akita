@@ -2,18 +2,16 @@ package common
 
 // BytePool implements a leaky pool of []byte in the form of a bounded
 type BytePool struct {
-	c     chan []byte
-	s     int // len of c
-	cap   int
-	clean bool
+	c   chan []byte
+	s   int // len of c
+	cap int
 }
 
 // NewBytePool create a new BytePool
-func NewBytePool(s int, cap int, clean bool) *BytePool {
+func NewBytePool(s int, cap int) *BytePool {
 	return &BytePool{
-		c:     make(chan []byte, s),
-		cap:   cap,
-		clean: clean,
+		c:   make(chan []byte, s),
+		cap: cap,
 	}
 }
 
@@ -30,13 +28,8 @@ func (p *BytePool) Get() (b []byte) {
 // Put give back a []byte to BytePool
 func (p *BytePool) Put(b []byte) {
 	select {
-	case p.c <- b:
+	case p.c <- b[:0]:
 	default:
 		// just discard
 	}
-}
-
-// Clean represent a []byte need to clen when put it to BytePool
-func (p *BytePool) Clean() bool {
-	return p.clean
 }

@@ -34,6 +34,14 @@ func main() {
 
 	go func() {
 		db.GetEngine().Start(server) // start akita listening
+		// TODO TimeEvent todo
+		dfsTicker := time.NewTicker(time.Second)
+		for {
+			select {
+			case <-dfsTicker.C:
+				db.GetEngine().GetDB().DataFileSync()
+			}
+		}
 	}()
 
 	if !db.GetEngine().IsMaster() {

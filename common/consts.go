@@ -1,9 +1,5 @@
 package common
 
-import (
-	"errors"
-)
-
 // TODO move to other dir.
 const (
 	K                      = 1 << 10
@@ -16,11 +12,4 @@ const (
 	CrcByteLength          = 4
 	KvsByteLength          = KsByteLength + VsByteLength
 	RecordHeaderByteLength = KsByteLength + VsByteLength + FlagByteLength
-)
-
-var (
-	// TODO need move to other file
-	ErrKeySize             = errors.New("key size is too large to save. ")
-	ErrDataHasBeenModified = errors.New("the data has been modified, not safe. ")
-	ErrNoDataUpdate        = errors.New("no data update. ")
 )

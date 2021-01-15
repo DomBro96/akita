@@ -1,6 +1,7 @@
 package db
 
 import (
+	"akita/aerrors"
 	"akita/common"
 	"akita/logger"
 	"os"
@@ -172,7 +173,7 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	crc32 := common.CreateCrc32(crcSrcBuf)
 	if crc32 != recordCrc32 {
 		logger.Warning.Printf("The data which offset: %v, length: %v has been modified, not safe. ", offset, length)
-		return nil, common.ErrDataHasBeenModified
+		return nil, aerrors.ErrDataHasBeenModified
 	}
 	return valueBuf, nil
 }
@@ -213,7 +214,7 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) error {
 func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 	length := db.GetSyncSize() - offset
 	if length <= 0 {
-		return nil, common.ErrNoDataUpdate
+		return nil, aerrors.ErrNoDataUpdate
 	}
 	dbFile, err := os.OpenFile(db.dfPath, os.O_RDONLY, 0644)
 	if err != nil {
@@ -296,4 +297,14 @@ func (db *DB) GetWriteRecordResult() error {
 		db.rwErrIndex = 0
 	}
 	return err
+}
+
+// DataFileSync flush system buffer data to the data file.
+func (db *DB) DataFileSync() {
+	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
+	if err != nil {
+		logger.Error.Printf("open data file error: %v", err)
+		return
+	}
+	dbFile.Sync()
 }

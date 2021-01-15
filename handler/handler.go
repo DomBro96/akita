@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"akita/aerrors"
 	"akita/ahttp"
 	"akita/common"
 	"akita/db"
@@ -25,7 +26,7 @@ func Save(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if len(common.StringToByteSlice(key)) > 10*common.K {
-		ahttp.WriteResponse(w, http.StatusBadRequest, common.ErrKeySize)
+		ahttp.WriteResponse(w, http.StatusBadRequest, aerrors.ErrKeySize)
 		return
 	}
 	_, file, err := req.FormFile("file")
@@ -133,7 +134,7 @@ func Sync(w http.ResponseWriter, req *http.Request) {
 
 	syncData := &pb.SyncData{}
 	if err != nil {
-		if err == common.ErrNoDataUpdate {
+		if err == aerrors.ErrNoDataUpdate {
 			notifier := make(chan struct{})
 			db.GetEngine().Register(req.Host, notifier)
 			select {

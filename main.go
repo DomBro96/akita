@@ -33,13 +33,13 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt, os.Kill)
 
 	go func() {
-		db.DefaultEngine().Start(server) // start akita listening
+		db.GetEngine().Start(server) // start akita listening
 	}()
 
-	if !db.DefaultEngine().IsMaster() {
+	if !db.GetEngine().IsMaster() {
 		go func() {
 			for {
-				db.DefaultEngine().DbSync()
+				db.GetEngine().DbSync()
 				time.Sleep(500 * time.Millisecond) // do sync request every half second
 			}
 		}()
@@ -47,21 +47,21 @@ func main() {
 
 	select {
 	case <-interrupt:
-		db.DefaultEngine().Close(server) // recycle resources
+		db.GetEngine().Close(server) // recycle resources
 		signal.Stop(interrupt)
 	}
 }
 
 func init() {
-	db.InitializeDefaultEngine(*master, strings.Split(*slaves, ","), *port, *dataFilePath, *useCache, *cacheLimit)
+	db.InitializeEngine(*master, strings.Split(*slaves, ","), *port, *dataFilePath, *useCache, *cacheLimit)
 	errch := make(chan error)
 	go func() {
-		err := db.DefaultEngine().GetDB().Reload()
+		err := db.GetEngine().GetDB().Reload()
 		errch <- err
 	}()
 	err := <-errch
 	if err != nil {
-		logger.Error.Fatalf("Reload data base erro: %s\n", err)
+		logger.Error.Fatalf("Reload data base error: %s\n", err)
 	}
-	go db.DefaultEngine().GetDB().WriteFromRecordQueue()
+	go db.GetEngine().GetDB().WriteFromRecordQueue()
 }

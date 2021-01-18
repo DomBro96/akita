@@ -18,6 +18,7 @@ type DB struct {
 	recordQueue     chan []byte  // recordQueue uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
 	recordWriteErrs []chan error // recordWriteErrs passing write record error
 	rwErrIndex      int          // rwErrIndex index of rec
+	recordBufPool   *common.BytePool
 }
 
 // OpenDB create a db object with data file path..
@@ -51,6 +52,7 @@ func OpenDB(fPath string) *DB {
 		recordQueue:     make(chan []byte, 100),
 		recordWriteErrs: make([]chan error, 100),
 		rwErrIndex:      0,
+		recordBufPool:   common.NewBytePool(100, 2*common.M),
 	}
 	for i := range db.recordWriteErrs {
 		db.recordWriteErrs[i] = make(chan error)
@@ -180,7 +182,7 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 
 // WriteRecord write byte stream record to data file.
 func (db *DB) WriteRecord(record *dataRecord) error {
-	recordBuf, err := record.getRecordBuf(true)
+	recordBuf, err := db.genRecordBuf(record, true)
 	if err != nil {
 		return err
 	}
@@ -198,7 +200,7 @@ func (db *DB) WriteRecord(record *dataRecord) error {
 
 // WriteRecordNoCrc32 write byte stream record but no crc32 to data file.
 func (db *DB) WriteRecordNoCrc32(record *dataRecord) error {
-	recordBuf, err := record.getRecordBuf(false)
+	recordBuf, err := db.genRecordBuf(record, false)
 	if err != nil {
 		return err
 	}
@@ -227,6 +229,41 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) {
+	ksBuf, err := common.Int32ToByteSlice(record.dateHeader.Ks)
+	if err != nil {
+		logger.Error.Printf("Turn int32 to byte slice error: %s\n", err)
+		return nil, err
+	}
+	vsBuf, err := common.Int32ToByteSlice(record.dateHeader.Vs)
+	if err != nil {
+		logger.Error.Printf("Turn int32 to byte slice error: %s\n", err)
+		return nil, err
+	}
+	flagBuf, err := common.Int32ToByteSlice(record.dateHeader.Flag)
+	if err != nil {
+		logger.Error.Printf("Turn int32 to byte slice error: %s\n", err)
+		return nil, err
+	}
+	recordBuf := db.recordBufPool.Get()
+	recordBuf = append(recordBuf, ksBuf...)
+	recordBuf = append(recordBuf, vsBuf...)
+	recordBuf = append(recordBuf, flagBuf...)
+	recordBuf = append(recordBuf, record.key...)
+	recordBuf = append(recordBuf, record.value...)
+	if checkCrc32 {
+		crc32 := common.CreateCrc32(recordBuf)
+		crcBuf, err := common.UintToByteSlice(crc32)
+		if err != nil {
+			logger.Error.Printf("Turn uint to byte slice error: %s\n", err)
+			return nil, err
+		}
+		recordBuf = append(recordBuf, crcBuf...)
+	}
+
+	return recordBuf, nil
 }
 
 // Close recycle some resource.
@@ -278,6 +315,7 @@ func (db *DB) WriteFromRecordQueue() {
 			db.size += recordLength
 			db.Unlock()
 			db.recordWriteErrs[i] <- nil
+			db.recordBufPool.Put(r)
 		}
 	}
 }

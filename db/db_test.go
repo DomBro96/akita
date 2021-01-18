@@ -33,7 +33,7 @@ func Test_WriteRecord(t *testing.T) {
 		key:   keyBytes,
 		value: value,
 	}
-	recordBuf, err := record.getRecordBuf(false)
+	recordBuf, err := d.genRecordBuf(record, false)
 	if err != nil {
 		t.Errorf("record get buf error: %s.\n", err)
 		return
@@ -150,7 +150,7 @@ func Test_WriteSyncData(t *testing.T) {
 		key:   keyBytes,
 		value: value,
 	}
-	recordBuf, err := record.getRecordBuf(false)
+	recordBuf, err := d.genRecordBuf(record, false)
 	if err != nil {
 		t.Errorf("record get buf error: %s.\n", err)
 		return
@@ -182,7 +182,7 @@ func Test_WriteSyncData(t *testing.T) {
 		key:   keyBytes1,
 		value: value1,
 	}
-	recordBuf1, err := record1.getRecordBuf(false)
+	recordBuf1, err := d.genRecordBuf(record1, false)
 	if err != nil {
 		t.Errorf("record get buf error: %s.\n", err)
 		return

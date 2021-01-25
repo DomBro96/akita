@@ -22,3 +22,11 @@ func init() {
 	Warning = log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
 	Error = log.New(io.MultiWriter(file, os.Stderr), "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
+
+func Infof(format string, v ...interface{}) {
+	Info.Printf(format, v...)
+}
+
+func Errorf(format string, v ...interface{}) {
+	Error.Printf(format, v...)
+}

@@ -1,7 +1,7 @@
 package db
 
 import (
-	"akita/aerrors"
+	"akita/akerrors"
 	"akita/common"
 	"akita/logger"
 	"errors"
@@ -26,24 +26,24 @@ func OpenDB(fPath string) *DB {
 	dir := filepath.Dir(fPath)
 	ok, err := common.FileIsExit(dir)
 	if err != nil {
-		logger.Error.Fatalf("Get data dir is exit error: %s\n", err)
+		logger.Fatalf("Get data dir is exit error: %s", err)
 	}
 	if !ok {
 		if err = os.Mkdir(dir, os.ModePerm); err != nil {
-			logger.Error.Fatalf("Make data file folder error: %s\n", err)
+			logger.Fatalf("Make data file folder error: %s", err)
 		}
 	}
 
 	// get dbFile size, and reload index
 	dbFile, err := os.OpenFile(fPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
-		logger.Error.Fatalf("Open data file "+fPath+" error: %s\n", err)
+		logger.Fatalf("Open data file "+fPath+" error: %s", err)
 	}
 	defer dbFile.Close()
 
 	fs, err := common.GetFileSize(dbFile)
 	if err != nil {
-		logger.Error.Fatalf("Get data file size error: %s\n", err)
+		logger.Fatalf("Get data file size error: %s", err)
 	}
 	db := &DB{
 		dfPath:             fPath,
@@ -151,14 +151,14 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 
 	recordBuf, err := common.ReadFileToBytes(dbFile, offset, length)
 	if err != nil {
-		logger.Error.Printf("Read data from file error: %s\n", err)
+		logger.Errorf("Read data from file error: %s", err)
 		return nil, err
 	}
 
 	ksBuf := recordBuf[0:common.KsByteLength]
 	ks, err := common.ByteSliceToInt32(ksBuf)
 	if err != nil {
-		logger.Error.Printf("Turn byte slice to int32 error: %s\n", err)
+		logger.Errorf("Turn byte slice to int32 error: %s", err)
 		return nil, err
 	}
 
@@ -166,15 +166,15 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	recordCrcBuf := recordBuf[(length - common.CrcByteLength):length]
 	recordCrc32, err := common.ByteSliceToUint(recordCrcBuf)
 	if err != nil {
-		logger.Error.Printf("Turn byte slice to uint error: %s\n", err)
+		logger.Errorf("Turn byte slice to uint error: %s", err)
 		return nil, err
 	}
 
 	crcSrcBuf := recordBuf[0:(length - common.CrcByteLength)]
 	crc32 := common.CreateCrc32(crcSrcBuf)
 	if crc32 != recordCrc32 {
-		logger.Warning.Printf("The data which offset: %v, length: %v has been modified, not safe. ", offset, length)
-		return nil, aerrors.ErrDataHasBeenModified
+		logger.Warningf("The data which offset: %v, length: %v has been modified, not safe. ", offset, length)
+		return nil, akerrors.ErrDataHasBeenModified
 	}
 	return valueBuf, nil
 }
@@ -188,7 +188,7 @@ func (db *DB) WriteRecord(record *dataRecord) error {
 	offsize := db.GetSyncSize()
 	db.PushRecordToQueue(recordBuf)
 	if err = db.GetWriteRecordResult(recordBuf); err != nil {
-		logger.Error.Printf("write record error: %v. \n", err)
+		logger.Errorf("write record error: %v", err)
 		return err
 	}
 	it := db.iTable
@@ -205,7 +205,7 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) error {
 	}
 	db.PushRecordToQueue(rf)
 	if err = db.GetWriteRecordResult(rf); err != nil {
-		logger.Error.Printf("write record error: %v. \n", err)
+		logger.Errorf("write record error: %v", err)
 		return err
 	}
 	return nil
@@ -215,7 +215,7 @@ func (db *DB) WriteRecordNoCrc32(record *dataRecord) error {
 func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 	length := db.GetSyncSize() - offset
 	if length <= 0 {
-		return nil, aerrors.ErrNoDataUpdate
+		return nil, akerrors.ErrNoDataUpdate
 	}
 	dbFile, err := os.OpenFile(db.dfPath, os.O_RDONLY, 0644)
 	if err != nil {
@@ -233,17 +233,17 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) {
 	ksBuf, err := common.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
-		logger.Error.Printf("Turn int32 to byte slice error: %s\n", err)
+		logger.Errorf("Turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
 	vsBuf, err := common.Int32ToByteSlice(record.dateHeader.Vs)
 	if err != nil {
-		logger.Error.Printf("Turn int32 to byte slice error: %s\n", err)
+		logger.Errorf("Turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
 	flagBuf, err := common.Int32ToByteSlice(record.dateHeader.Flag)
 	if err != nil {
-		logger.Error.Printf("Turn int32 to byte slice error: %s\n", err)
+		logger.Errorf("Turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
 	recordBuf := db.recordBufPool.Get()
@@ -256,7 +256,7 @@ func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) 
 		crc32 := common.CreateCrc32(recordBuf)
 		crcBuf, err := common.UintToByteSlice(crc32)
 		if err != nil {
-			logger.Error.Printf("Turn uint to byte slice error: %s\n", err)
+			logger.Errorf("Turn uint to byte slice error: %s", err)
 			return nil, err
 		}
 		recordBuf = append(recordBuf, crcBuf...)
@@ -279,13 +279,13 @@ func (db *DB) WriteSyncData(dataBuff []byte) error {
 	offset := db.GetSyncSize()
 	db.PushRecordToQueue(dataBuff)
 	if err := db.GetWriteRecordResult(dataBuff); err != nil {
-		logger.Error.Printf("write sync data error: %v. \n", err)
+		logger.Errorf("write sync data error: %v", err)
 		return err
 	}
 
 	err := db.UpdateTableWithData(offset, dataBuff)
 	if err != nil {
-		logger.Error.Printf("update index table error: %s\n", err)
+		logger.Errorf("update index table error: %v", err)
 		return err
 	}
 	return nil
@@ -341,7 +341,7 @@ func (db *DB) GetWriteRecordResult(r []byte) error {
 func (db *DB) DataFileSync() {
 	dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
 	if err != nil {
-		logger.Error.Printf("open data file error: %v", err)
+		logger.Errorf("open data file error: %v", err)
 		return
 	}
 	dbFile.Sync()

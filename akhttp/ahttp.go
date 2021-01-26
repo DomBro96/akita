@@ -1,4 +1,4 @@
-package ahttp
+package akhttp
 
 import (
 	"akita/logger"
@@ -15,14 +15,14 @@ func WriteResponse(w http.ResponseWriter, code int, resp interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	data, err := json.Marshal(resp)
 	if err != nil {
-		logger.Error.Printf("Failed to encode data to JSON. Data %v Error %v.", resp, err)
+		logger.Errorf("Failed to encode data to JSON. Data %v Error %v.", resp, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(code)
 	_, err = w.Write(data)
 	if err != nil {
-		logger.Error.Printf("Failed to write http response %v", err)
+		logger.Errorf("Failed to write http response %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -32,14 +32,14 @@ func WriteResponseWithContextType(w http.ResponseWriter, code int, contentType s
 	w.Header().Set("Content-Type", contentType)
 	data, err := json.Marshal(resp)
 	if err != nil {
-		logger.Error.Printf("Failed to encode data to JSON. Data %v Error %v.", resp, err)
+		logger.Errorf("Failed to encode data to JSON. Data %v Error %v.", resp, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(code)
 	_, err = w.Write(data)
 	if err != nil {
-		logger.Error.Printf("Failed to write http response %v", err)
+		logger.Errorf("Failed to write http response %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -127,5 +127,3 @@ func (hc *HttpClient) Get(url string) ([]byte, error) {
 	data, err := ioutil.ReadAll(resp.Body)
 	return data, err
 }
-
-

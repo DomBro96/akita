@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-// TODO: opt log
+// TODO: rename this package name --> aklog
 var (
 	Info    *log.Logger
 	Warning *log.Logger
@@ -23,10 +23,36 @@ func init() {
 	Error = log.New(io.MultiWriter(file, os.Stderr), "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
+// Infof to print the info log, call Logger.Printf()
 func Infof(format string, v ...interface{}) {
+	format += " \n"
 	Info.Printf(format, v...)
 }
 
+// Infoln to print the info log, call Logger.Println()
+func Infoln(v ...interface{}) {
+	Info.Println(v...)
+}
+
+// Errorf to print the error log, call Logger.Printf()
 func Errorf(format string, v ...interface{}) {
+	format += " \n"
 	Error.Printf(format, v...)
+}
+
+// Warningf to print the warning log, call Logger.Printf()
+func Warningf(format string, v ...interface{}) {
+	format += " \n"
+	Warning.Panicf(format, v...)
+}
+
+// Fatalf to print the fatal log, call Logger.Fatalf()
+func Fatalf(format string, v ...interface{}) {
+	format += " \n"
+	Error.Fatalf(format, v...)
+}
+
+// Fatalln to print the fatal log, call Logger.Fatalln()
+func Fatalln(v ...interface{}) {
+	Error.Fatalln(v...)
 }

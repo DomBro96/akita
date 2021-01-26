@@ -69,7 +69,7 @@ func init() {
 	}()
 	err := <-errch
 	if err != nil {
-		logger.Error.Fatalf("Reload data base error: %s\n", err)
+		logger.Fatalf("Reload data base error: %v", err)
 	}
 	go db.GetEngine().GetDB().WriteFromRecordQueue()
 }

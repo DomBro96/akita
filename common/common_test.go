@@ -1,7 +1,6 @@
 package common
 
 import (
-	"akita/logger"
 	"fmt"
 	"strings"
 	"testing"
@@ -83,9 +82,4 @@ func TestGetIntranetIp(t *testing.T) {
 		fmt.Println(err)
 	}
 	fmt.Println(intranet)
-}
-
-func TestLogger(t *testing.T) {
-	logger.Info.Println("hello")
-	logger.Warning.Println("world")
 }

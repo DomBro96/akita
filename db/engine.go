@@ -1,7 +1,7 @@
 package db
 
 import (
-	"akita/ahttp"
+	"akita/akhttp"
 	"akita/common"
 	"akita/logger"
 	"akita/pb"
@@ -64,7 +64,7 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 	valueBuf := make([]byte, length)
 	_, err := src.Read(valueBuf)
 	if err != nil {
-		logger.Error.Printf("Insert key %v failed:  %v \n", key, err)
+		logger.Errorf("Insert key %v failed:  %v", key, err)
 		return false, err
 	}
 	ks := len(keyBuf)
@@ -79,7 +79,7 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 	}
 	db := e.db
 	if err := db.WriteRecord(dr); err != nil {
-		logger.Error.Printf("Insert key %v failed:  %v \n", key, err)
+		logger.Errorf("Insert key %v failed:  %v \n", key, err)
 		return false, err
 	}
 	e.notify()
@@ -114,7 +114,7 @@ func (e *Engine) Seek(key string) ([]byte, error) {
 	value := <-data
 	err := <-complete
 	if err != nil {
-		logger.Error.Printf("seek key: %v failed. err: %v \n", key, err)
+		logger.Errorf("seek key: %v failed. err: %v \n", key, err)
 		return nil, err
 	}
 	if e.useCache {
@@ -146,7 +146,7 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 
 	err := e.db.WriteRecordNoCrc32(dr)
 	if err != nil {
-		logger.Error.Printf("Delete key: "+key+" failed: %v \n", err)
+		logger.Errorf("Delete key: "+key+" failed: %v", err)
 		return false, 0, err
 	}
 	e.notify()
@@ -162,25 +162,25 @@ func (e *Engine) DbSync() error {
 	}
 	protoData, err := proto.Marshal(syncOffset)
 	if err != nil {
-		logger.Error.Printf("marshal data to proto error: %v\n", err)
+		logger.Errorf("marshal data to proto error: %v", err)
 		return err
 	}
 	reader := bytes.NewReader(protoData)
-	hc := ahttp.NewHttpClient(2000 * time.Millisecond)
+	hc := akhttp.NewHttpClient(2000 * time.Millisecond)
 	url := fmt.Sprintf("%v%v:%v%v", "http://", e.master, e.port, "/akita/syn/")
 	statusCode, data, err := hc.Post(url, "application/protobuf", reader)
 	if err != nil {
-		logger.Error.Printf("sync request fail: %v\n", err)
+		logger.Errorf("sync request fail: %v", err)
 		return err
 	}
 	if statusCode != 200 {
-		logger.Info.Printf("sync data from fail info : %v\n", err)
+		logger.Infof("sync data from fail info : %v", err)
 		return err
 	}
 	syncData := &pb.SyncData{}
 	err = proto.Unmarshal(data, syncData)
 	if err != nil {
-		logger.Error.Printf("proto data unmarshal error: %v \n", err)
+		logger.Errorf("proto data unmarshal error: %v \n", err)
 		return err
 	}
 	if syncData.Code != 0 {
@@ -193,7 +193,7 @@ func (e *Engine) DbSync() error {
 func (e *Engine) IsMaster() bool {
 	intranet, err := common.GetIntranetIP()
 	if err != nil {
-		logger.Warning.Panicln("check your web environment， make sure your machine has intranet ip.")
+		logger.Fatalln("check your web environment， make sure your machine has intranet ip.")
 	}
 	return intranet == e.master
 }
@@ -216,22 +216,22 @@ func (e *Engine) Register(slaveHost string, notifier chan struct{}) {
 
 // Start start akita server service.
 func (e *Engine) Start(server *http.Server) {
-	logger.Info.Println("akita server starting... ")
+	logger.Infoln("akita server starting... ")
 	if err := server.ListenAndServe(); err != nil {
-		logger.Error.Fatalf("start http server error %v", err)
+		logger.Fatalf("start http server error %v", err)
 	}
 }
 
 // Close close server, stop provide service.
 func (e *Engine) Close(server *http.Server) {
 
-	logger.Info.Println("akita server stopping... ")
+	logger.Infoln("akita server stopping... ")
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Error.Printf("shut down http server error %v", err)
+		logger.Errorf("shut down http server error %v", err)
 		return
 	}
-	e.db.Close()
-	logger.Info.Println("akita server stopped. ")
+	defer e.db.Close()
+	logger.Infoln("akita server stopped. ")
 }

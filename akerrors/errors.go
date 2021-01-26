@@ -1,4 +1,4 @@
-package aerrors
+package akerrors
 
 import "errors"
 

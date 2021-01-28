@@ -4,6 +4,7 @@ import (
 	"akita/akerrors"
 	"akita/akhttp"
 	"akita/common"
+	"akita/consts"
 	"akita/db"
 	"akita/logger"
 	"akita/pb"
@@ -25,7 +26,7 @@ func Save(w http.ResponseWriter, req *http.Request) {
 		akhttp.WriteResponse(w, http.StatusBadRequest, "key can not be empty! ")
 		return
 	}
-	if len(common.StringToByteSlice(key)) > 10*common.K {
+	if len(common.StringToByteSlice(key)) > 10*consts.K {
 		akhttp.WriteResponse(w, http.StatusBadRequest, akerrors.ErrKeySize)
 		return
 	}
@@ -41,7 +42,7 @@ func Save(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var length int64
-	if length = file.Size; length > 64*common.M {
+	if length = file.Size; length > 64*consts.M {
 		logger.Errorf("Upload file too large: %v", length)
 		akhttp.WriteResponse(w, http.StatusBadRequest, "file is too large to save. ")
 		return

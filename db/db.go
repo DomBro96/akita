@@ -3,6 +3,7 @@ package db
 import (
 	"akita/akerrors"
 	"akita/common"
+	"akita/consts"
 	"akita/logger"
 	"errors"
 	"os"
@@ -51,7 +52,7 @@ func OpenDB(fPath string) *DB {
 		iTable:             newIndexTable(),
 		recordBufQueue:     make(chan []byte, 100),
 		recordBufWriteErrs: make(map[uint32]chan error),
-		recordBufPool:      common.NewBytePool(100, 2*common.M),
+		recordBufPool:      common.NewBytePool(100, 2*consts.M),
 	}
 	for i := range db.recordBufWriteErrs {
 		db.recordBufWriteErrs[i] = make(chan error)
@@ -71,7 +72,7 @@ func (db *DB) Reload() error {
 	db.Lock()
 	length := db.size
 	db.Unlock()
-	if length <= common.RecordHeaderByteLength {
+	if length <= consts.LengthRecordHeader {
 		return nil
 	}
 
@@ -102,12 +103,11 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 
 // UpdateTableWithData update db index table with data buf.
 func (db *DB) UpdateTableWithData(offset int64, dataBuff []byte) error {
-
 	bufOffset, length := int64(0), int64(len(dataBuff))
 	for bufOffset < length {
-		ksBuf := dataBuff[bufOffset:(bufOffset + common.KsByteLength)]
-		vsBuf := dataBuff[(bufOffset + common.KsByteLength):(bufOffset + common.KvsByteLength)]
-		flagBuf := dataBuff[(bufOffset + common.KvsByteLength):(bufOffset + common.RecordHeaderByteLength)]
+		ksBuf := dataBuff[bufOffset:(bufOffset + consts.LengthKs)]
+		vsBuf := dataBuff[(bufOffset + consts.LengthKs):(bufOffset + consts.LengthKVs)]
+		flagBuf := dataBuff[(bufOffset + consts.LengthKVs):(bufOffset + consts.LengthRecordHeader)]
 
 		ks, err := common.ByteSliceToInt32(ksBuf)
 		if err != nil {
@@ -117,19 +117,19 @@ func (db *DB) UpdateTableWithData(offset int64, dataBuff []byte) error {
 		if err != nil {
 			return err
 		}
-		keyBuf := dataBuff[(bufOffset + common.RecordHeaderByteLength):(bufOffset + common.RecordHeaderByteLength + int64(ks))]
+		keyBuf := dataBuff[(bufOffset + consts.LengthRecordHeader):(bufOffset + consts.LengthRecordHeader + int64(ks))]
 		key := common.ByteSliceToString(keyBuf)
 		flag, err := common.ByteSliceToInt32(flagBuf)
 		if err != nil {
 			return err
 		}
-		if flag == common.DeleteFlag {
+		if flag == consts.FlagDelete {
 			db.iTable.remove(key)
-			bufOffset += common.RecordHeaderByteLength + int64(ks) + int64(vs)
+			bufOffset += consts.LengthRecordHeader + int64(ks) + int64(vs)
 			continue
 		}
 
-		rs := common.RecordHeaderByteLength + int(ks) + int(vs) + common.CrcByteLength
+		rs := consts.LengthRecordHeader + int(ks) + int(vs) + consts.LengthCrc32
 		ri := recordIndex{
 			offset: offset + bufOffset,
 			size:   int64(rs),
@@ -155,22 +155,22 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 		return nil, err
 	}
 
-	ksBuf := recordBuf[0:common.KsByteLength]
+	ksBuf := recordBuf[0:consts.LengthKs]
 	ks, err := common.ByteSliceToInt32(ksBuf)
 	if err != nil {
 		logger.Errorf("Turn byte slice to int32 error: %s", err)
 		return nil, err
 	}
 
-	valueBuf := recordBuf[(common.RecordHeaderByteLength + int64(ks)):(length - common.CrcByteLength)]
-	recordCrcBuf := recordBuf[(length - common.CrcByteLength):length]
+	valueBuf := recordBuf[(consts.LengthRecordHeader + int64(ks)):(length - consts.LengthCrc32)]
+	recordCrcBuf := recordBuf[(length - consts.LengthCrc32):length]
 	recordCrc32, err := common.ByteSliceToUint(recordCrcBuf)
 	if err != nil {
 		logger.Errorf("Turn byte slice to uint error: %s", err)
 		return nil, err
 	}
 
-	crcSrcBuf := recordBuf[0:(length - common.CrcByteLength)]
+	crcSrcBuf := recordBuf[0:(length - consts.LengthCrc32)]
 	crc32 := common.CreateCrc32(crcSrcBuf)
 	if crc32 != recordCrc32 {
 		logger.Warningf("The data which offset: %v, length: %v has been modified, not safe. ", offset, length)

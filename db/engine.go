@@ -3,6 +3,7 @@ package db
 import (
 	"akita/akhttp"
 	"akita/common"
+	"akita/consts"
 	"akita/logger"
 	"akita/pb"
 	"bytes"
@@ -72,7 +73,7 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 		dateHeader: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(length),
-			Flag: common.WriteFlag,
+			Flag: consts.FlagWrite,
 		},
 		key:   keyBuf,
 		value: valueBuf,
@@ -138,7 +139,7 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 		dateHeader: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(0),
-			Flag: common.DeleteFlag,
+			Flag: consts.FlagDelete,
 		},
 		key:   keyBuf,
 		value: nil,

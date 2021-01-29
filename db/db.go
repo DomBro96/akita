@@ -11,15 +11,21 @@ import (
 	"sync"
 )
 
-// DB kv database struct.
+// DB stands for the underlying storage
+// providing a full memory index based on the map structure
+// and sequential writing to data files
 type DB struct {
 	sync.Mutex
-	dfPath             string                // data file path
-	size               int64                 // data file size / next insert offset
-	iTable             *indexTable           // db index
-	recordBufQueue     chan []byte           // recordQueue uses channel to write data to db file avoid using lock in I/O, "use communication to share data"
-	recordBufWriteErrs map[uint32]chan error // recordWriteErrs passing write record error
-	recordBufPool      *common.BytePool
+	dfPath string
+	size   int64 // next insert offset
+	iTable *indexTable
+	// uses a buffered channel to pass write data,
+	// a gr that writes data specifically reads recordBuffQueue and writes data to the db file.
+	// this is design is to avoid using locks in I/O, "use communication to share data"
+	recordBuffQueue chan []byte
+	// write data errors are passed through recordBuffWriteErrs in current gr and write data gr
+	recordBuffWriteErrs map[uint32]chan error
+	recordBufPool       *common.BytePool
 }
 
 // OpenDB create a db object with data file path..
@@ -36,27 +42,26 @@ func OpenDB(fPath string) *DB {
 	}
 
 	// get dbFile size, and reload index
-	dbFile, err := os.OpenFile(fPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
+	dbFile, err := os.OpenFile(fPath, os.O_RDONLY, 0644)
 	if err != nil {
 		logger.Fatalf("Open data file "+fPath+" error: %s", err)
 	}
 	defer dbFile.Close()
 
-	fs, err := common.GetFileSize(dbFile)
+	fi, err := dbFile.Stat()
 	if err != nil {
-		logger.Fatalf("Get data file size error: %s", err)
+		logger.Fatalf("Get data file "+fPath+" info error: %s", err)
 	}
+
 	db := &DB{
-		dfPath:             fPath,
-		size:               fs,
-		iTable:             newIndexTable(),
-		recordBufQueue:     make(chan []byte, 100),
-		recordBufWriteErrs: make(map[uint32]chan error),
-		recordBufPool:      common.NewBytePool(100, 2*consts.M),
+		dfPath:              fPath,
+		size:                fi.Size(),
+		iTable:              newIndexTable(),
+		recordBuffQueue:     make(chan []byte, 100),
+		recordBuffWriteErrs: make(map[uint32]chan error),
+		recordBufPool:       common.NewBytePool(100, 2*consts.M),
 	}
-	for i := range db.recordBufWriteErrs {
-		db.recordBufWriteErrs[i] = make(chan error)
-	}
+
 	return db
 }
 
@@ -193,7 +198,7 @@ func (db *DB) WriteRecord(record *dataRecord) error {
 	}
 	it := db.iTable
 	ri := &recordIndex{offset: offsize, size: int64(len(recordBuf))}
-	it.put(string(record.key), ri)
+	it.put(common.ByteSliceToString(record.key), ri)
 	return nil
 }
 
@@ -267,10 +272,10 @@ func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) 
 
 // Close recycle some resource.
 func (db *DB) Close() error {
-	for i := range db.recordBufWriteErrs {
-		close(db.recordBufWriteErrs[i])
+	for key := range db.recordBuffWriteErrs {
+		close(db.recordBuffWriteErrs[key])
 	}
-	close(db.recordBufQueue)
+	close(db.recordBuffQueue)
 	return nil
 }
 
@@ -291,30 +296,29 @@ func (db *DB) WriteSyncData(dataBuff []byte) error {
 	return nil
 }
 
-// WriteFromRecordQueue write the data to data file with channel.
-func (db *DB) WriteFromRecordQueue() {
-
+// WriteRecordBuffQueueData write the data to data file with channel.
+func (db *DB) WriteRecordBuffQueueData() {
 	for {
 		select {
-		case r := <-db.recordBufQueue:
+		case r := <-db.recordBuffQueue:
 			k := common.CreateCrc32(r)
-			db.recordBufWriteErrs[k] = make(chan error)
-			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY, 0644)
+			db.recordBuffWriteErrs[k] = make(chan error)
+			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY|os.O_APPEND, 0644)
 			if err != nil {
-				db.recordBufWriteErrs[k] <- err
+				db.recordBuffWriteErrs[k] <- err
 				continue
 			}
-			recordLength, err := common.WriteBufToFile(dbFile, db.size, r)
+			_, err = dbFile.Write(r)
 			if err != nil {
-				db.recordBufWriteErrs[k] <- err
+				db.recordBuffWriteErrs[k] <- err
 				dbFile.Close()
 				continue
 			}
 			dbFile.Close()
 			db.Lock()
-			db.size += recordLength
+			db.size += int64(len(r))
 			db.Unlock()
-			db.recordBufWriteErrs[k] <- nil
+			db.recordBuffWriteErrs[k] <- nil
 			db.recordBufPool.Put(r)
 		}
 	}
@@ -322,17 +326,17 @@ func (db *DB) WriteFromRecordQueue() {
 
 // PushRecordToQueue send records to recordQueue
 func (db *DB) PushRecordToQueue(r []byte) {
-	db.recordBufQueue <- r
+	db.recordBuffQueue <- r
 }
 
 // GetWriteRecordResult get write record error
 func (db *DB) GetWriteRecordResult(r []byte) error {
 	k := common.CreateCrc32(r)
-	errCh, ok := db.recordBufWriteErrs[k]
+	errCh, ok := db.recordBuffWriteErrs[k]
 	if !ok {
 		return errors.New("data has some problem")
 	}
-	defer delete(db.recordBufWriteErrs, k)
+	defer delete(db.recordBuffWriteErrs, k)
 	defer close(errCh)
 	return <-errCh
 }

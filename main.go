@@ -71,5 +71,5 @@ func init() {
 	if err != nil {
 		logger.Fatalf("Reload data base error: %v", err)
 	}
-	go db.GetEngine().GetDB().WriteFromRecordQueue()
+	go db.GetEngine().GetDB().WriteRecordBuffQueueData()
 }

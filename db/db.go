@@ -25,7 +25,9 @@ type DB struct {
 	recordBuffQueue chan []byte
 	// write data errors are passed through recordBuffWriteErrs in current gr and write data gr
 	recordBuffWriteErrs map[uint32]chan error
-	recordBuffPool      *common.BytePool
+	// recordBuffPool reduces the consumption caused by GC recycling byte slices.
+	// Get byte slice from recordBuffPool and write it into data file, and put it back to recordBuffPool after success
+	recordBuffPool *common.BytePool
 }
 
 // OpenDB create a db object with data file path..
@@ -305,12 +307,14 @@ func (db *DB) WriteRecordBuffQueueData() {
 			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY|os.O_APPEND, 0644)
 			if err != nil {
 				db.recordBuffWriteErrs[k] <- err
+				db.recordBuffPool.Put(r)
 				continue
 			}
 			_, err = dbFile.Write(r)
 			if err != nil {
-				db.recordBuffWriteErrs[k] <- err
 				dbFile.Close()
+				db.recordBuffWriteErrs[k] <- err
+				db.recordBuffPool.Put(r)
 				continue
 			}
 			dbFile.Close()

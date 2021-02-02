@@ -33,24 +33,23 @@ func OpenDB(fPath string) *DB {
 	dir := filepath.Dir(fPath)
 	ok, err := common.FileIsExit(dir)
 	if err != nil {
-		logger.Fatalf("Get data dir is exit error: %s", err)
+		logger.Fatalf("get data dir is exit error: %s", err)
 	}
 	if !ok {
 		if err = os.Mkdir(dir, os.ModePerm); err != nil {
-			logger.Fatalf("Make data file folder error: %s", err)
+			logger.Fatalf("make data file folder error: %s", err)
 		}
 	}
 
-	// get dbFile size, and reload index
 	dbFile, err := os.OpenFile(fPath, os.O_RDONLY, 0644)
 	if err != nil {
-		logger.Fatalf("Open data file "+fPath+" error: %s", err)
+		logger.Fatalf("open data file %s error: %v", fPath, err)
 	}
 	defer dbFile.Close()
 
 	fi, err := dbFile.Stat()
 	if err != nil {
-		logger.Fatalf("Get data file "+fPath+" info error: %s", err)
+		logger.Fatalf("get data file %s info error: %s", fPath, err)
 	}
 
 	db := &DB{
@@ -61,7 +60,6 @@ func OpenDB(fPath string) *DB {
 		recordBuffWriteErrs: make(map[uint32]chan error),
 		recordBufPool:       common.NewBytePool(100, 2*consts.M),
 	}
-
 	return db
 }
 
@@ -156,14 +154,14 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 
 	recordBuf, err := common.ReadFileToBytes(dbFile, offset, length)
 	if err != nil {
-		logger.Errorf("Read data from file error: %s", err)
+		logger.Errorf("read data from file error: %s", err)
 		return nil, err
 	}
 
 	ksBuf := recordBuf[0:consts.LengthKs]
 	ks, err := common.ByteSliceToInt32(ksBuf)
 	if err != nil {
-		logger.Errorf("Turn byte slice to int32 error: %s", err)
+		logger.Errorf("turn byte slice to int32 error: %s", err)
 		return nil, err
 	}
 
@@ -171,14 +169,14 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 	recordCrcBuf := recordBuf[(length - consts.LengthCrc32):length]
 	recordCrc32, err := common.ByteSliceToUint(recordCrcBuf)
 	if err != nil {
-		logger.Errorf("Turn byte slice to uint error: %s", err)
+		logger.Errorf("turn byte slice to uint error: %s", err)
 		return nil, err
 	}
 
 	crcSrcBuf := recordBuf[0:(length - consts.LengthCrc32)]
 	crc32 := common.CreateCrc32(crcSrcBuf)
 	if crc32 != recordCrc32 {
-		logger.Warningf("The data which offset: %v, length: %v has been modified, not safe. ", offset, length)
+		logger.Warningf("the data which offset: %v, length: %v has been modified, not safe. ", offset, length)
 		return nil, akerrors.ErrDataHasBeenModified
 	}
 	return valueBuf, nil
@@ -236,38 +234,39 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 }
 
 func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) {
-	ksBuf, err := common.Int32ToByteSlice(record.dateHeader.Ks)
+	ksBuff, err := common.Int32ToByteSlice(record.dateHeader.Ks)
 	if err != nil {
-		logger.Errorf("Turn int32 to byte slice error: %s", err)
+		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
-	vsBuf, err := common.Int32ToByteSlice(record.dateHeader.Vs)
+	vsBuff, err := common.Int32ToByteSlice(record.dateHeader.Vs)
 	if err != nil {
-		logger.Errorf("Turn int32 to byte slice error: %s", err)
+		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
-	flagBuf, err := common.Int32ToByteSlice(record.dateHeader.Flag)
+	flagBuff, err := common.Int32ToByteSlice(record.dateHeader.Flag)
 	if err != nil {
-		logger.Errorf("Turn int32 to byte slice error: %s", err)
+		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
-	recordBuf := db.recordBufPool.Get()
-	recordBuf = append(recordBuf, ksBuf...)
-	recordBuf = append(recordBuf, vsBuf...)
-	recordBuf = append(recordBuf, flagBuf...)
-	recordBuf = append(recordBuf, record.key...)
-	recordBuf = append(recordBuf, record.value...)
+	recordBuff := db.recordBufPool.Get()
+	recordBuff = append(recordBuff, ksBuff...)
+	recordBuff = append(recordBuff, vsBuff...)
+	recordBuff = append(recordBuff, flagBuff...)
+	recordBuff = append(recordBuff, record.key...)
+	recordBuff = append(recordBuff, record.value...)
+
 	if checkCrc32 {
-		crc32 := common.CreateCrc32(recordBuf)
-		crcBuf, err := common.UintToByteSlice(crc32)
+		crc32 := common.CreateCrc32(recordBuff)
+		crc32Buff, err := common.UintToByteSlice(crc32)
 		if err != nil {
-			logger.Errorf("Turn uint to byte slice error: %s", err)
+			logger.Errorf("turn uint to byte slice error: %s", err)
 			return nil, err
 		}
-		recordBuf = append(recordBuf, crcBuf...)
+		recordBuff = append(recordBuff, crc32Buff...)
 	}
 
-	return recordBuf, nil
+	return recordBuff, nil
 }
 
 // Close recycle some resource.

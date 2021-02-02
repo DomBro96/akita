@@ -17,7 +17,7 @@ var (
 	master       = flag.String("master_addr", "localhost", "master node ip address. ")
 	slaves       = flag.String("slaves_addr", "", "slaves nodes ip address set. ")
 	dataFilePath = flag.String("data_file", "/usr/local/akdata.dat", "akita data file path. ")
-	useCache     = flag.Bool("use_cache", false, "use lru cache.")
+	useCache     = flag.Bool("use_cache", true, "use lru cache.")
 	cacheLimit   = flag.Int("cache_limit", 1000, "maximum number of caches.")
 )
 
@@ -44,6 +44,8 @@ func main() {
 		}
 	}()
 
+	go db.GetEngine().GetDB().WriteRecordBuffQueueData()
+
 	if !db.GetEngine().IsMaster() {
 		go func() {
 			for {
@@ -62,14 +64,8 @@ func main() {
 
 func init() {
 	db.InitializeEngine(*master, strings.Split(*slaves, ","), *port, *dataFilePath, *useCache, *cacheLimit)
-	errch := make(chan error)
-	go func() {
-		err := db.GetEngine().GetDB().Reload()
-		errch <- err
-	}()
-	err := <-errch
+	err := db.GetEngine().GetDB().Reload()
 	if err != nil {
-		logger.Fatalf("Reload data base error: %v", err)
+		logger.Fatalf("reload data base error: %v", err)
 	}
-	go db.GetEngine().GetDB().WriteRecordBuffQueueData()
 }

@@ -104,6 +104,7 @@ func (e *Engine) Seek(key string) ([]byte, error) {
 	if ri == nil {
 		return nil, nil
 	}
+
 	data := make(chan []byte)
 	complete := make(chan error)
 	go func() {
@@ -111,11 +112,11 @@ func (e *Engine) Seek(key string) ([]byte, error) {
 		data <- value
 		complete <- err
 	}()
-	// will block
+
 	value := <-data
 	err := <-complete
 	if err != nil {
-		logger.Errorf("seek key: %v failed. err: %v \n", key, err)
+		logger.Errorf("seek key: %v failed. err: %v", key, err)
 		return nil, err
 	}
 	if e.useCache {
@@ -181,7 +182,7 @@ func (e *Engine) DbSync() error {
 	syncData := &pb.SyncData{}
 	err = proto.Unmarshal(data, syncData)
 	if err != nil {
-		logger.Errorf("proto data unmarshal error: %v \n", err)
+		logger.Errorf("proto data unmarshal error: %v", err)
 		return err
 	}
 	if syncData.Code != 0 {
@@ -194,7 +195,7 @@ func (e *Engine) DbSync() error {
 func (e *Engine) IsMaster() bool {
 	intranet, err := common.GetIntranetIP()
 	if err != nil {
-		logger.Fatalln("check your web environment， make sure your machine has intranet ip.")
+		logger.Fatalln("check your web environment, make sure your machine has intranet ip.")
 	}
 	return intranet == e.master
 }
@@ -225,7 +226,6 @@ func (e *Engine) Start(server *http.Server) {
 
 // Close close server, stop provide service.
 func (e *Engine) Close(server *http.Server) {
-
 	logger.Infoln("akita server stopping... ")
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()

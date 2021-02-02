@@ -25,7 +25,7 @@ type DB struct {
 	recordBuffQueue chan []byte
 	// write data errors are passed through recordBuffWriteErrs in current gr and write data gr
 	recordBuffWriteErrs map[uint32]chan error
-	recordBufPool       *common.BytePool
+	recordBuffPool      *common.BytePool
 }
 
 // OpenDB create a db object with data file path..
@@ -58,7 +58,7 @@ func OpenDB(fPath string) *DB {
 		iTable:              newIndexTable(),
 		recordBuffQueue:     make(chan []byte, 100),
 		recordBuffWriteErrs: make(map[uint32]chan error),
-		recordBufPool:       common.NewBytePool(100, 2*consts.M),
+		recordBuffPool:      common.NewBytePool(100, 2*consts.M),
 	}
 	return db
 }
@@ -249,7 +249,7 @@ func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) 
 		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
-	recordBuff := db.recordBufPool.Get()
+	recordBuff := db.recordBuffPool.Get()
 	recordBuff = append(recordBuff, ksBuff...)
 	recordBuff = append(recordBuff, vsBuff...)
 	recordBuff = append(recordBuff, flagBuff...)
@@ -318,7 +318,7 @@ func (db *DB) WriteRecordBuffQueueData() {
 			db.size += int64(len(r))
 			db.Unlock()
 			db.recordBuffWriteErrs[k] <- nil
-			db.recordBufPool.Put(r)
+			db.recordBuffPool.Put(r)
 		}
 	}
 }

@@ -42,7 +42,7 @@ func Test_WriteRecord(t *testing.T) {
 
 	go func(db *DB) {
 		t.Logf("test write record from RecordQueue=====>  \n")
-		db.WriteFromRecordQueue()
+		db.WriteRecordBuffQueueData()
 	}(d)
 
 	err = d.WriteRecord(record)
@@ -221,7 +221,7 @@ func BenchmarkWriteRecord(b *testing.B) {
 	d := OpenDB("/usr/local/akdata/akita.dat")
 	go func(db *DB) {
 		b.Logf("benchmark write record from RecordQueue...\n")
-		db.WriteFromRecordQueue()
+		db.WriteRecordBuffQueueData()
 	}(d)
 	keyPre := "benchmark"
 	for i := 0; i < b.N; i++ {

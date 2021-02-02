@@ -260,7 +260,7 @@ func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) 
 		crc32 := common.CreateCrc32(recordBuff)
 		crc32Buff, err := common.UintToByteSlice(crc32)
 		if err != nil {
-			logger.Errorf("turn uint to byte slice error: %s", err)
+			logger.Errorf("turn uint to byte slice error: %v", err)
 			return nil, err
 		}
 		recordBuff = append(recordBuff, crc32Buff...)

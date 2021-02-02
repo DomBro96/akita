@@ -25,7 +25,9 @@ type DB struct {
 	recordBuffQueue chan []byte
 	// write data errors are passed through recordBuffWriteErrs in current gr and write data gr
 	recordBuffWriteErrs map[uint32]chan error
-	recordBufPool       *common.BytePool
+	// recordBuffPool reduces the consumption caused by GC recycling byte slices.
+	// Get byte slice from recordBuffPool and write it into data file, and put it back to recordBuffPool after success
+	recordBuffPool *common.BytePool
 }
 
 // OpenDB create a db object with data file path..
@@ -58,7 +60,7 @@ func OpenDB(fPath string) *DB {
 		iTable:              newIndexTable(),
 		recordBuffQueue:     make(chan []byte, 100),
 		recordBuffWriteErrs: make(map[uint32]chan error),
-		recordBufPool:       common.NewBytePool(100, 2*consts.M),
+		recordBuffPool:      common.NewBytePool(100, 2*consts.M),
 	}
 	return db
 }
@@ -249,7 +251,7 @@ func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) 
 		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
-	recordBuff := db.recordBufPool.Get()
+	recordBuff := db.recordBuffPool.Get()
 	recordBuff = append(recordBuff, ksBuff...)
 	recordBuff = append(recordBuff, vsBuff...)
 	recordBuff = append(recordBuff, flagBuff...)
@@ -260,7 +262,7 @@ func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) 
 		crc32 := common.CreateCrc32(recordBuff)
 		crc32Buff, err := common.UintToByteSlice(crc32)
 		if err != nil {
-			logger.Errorf("turn uint to byte slice error: %s", err)
+			logger.Errorf("turn uint to byte slice error: %v", err)
 			return nil, err
 		}
 		recordBuff = append(recordBuff, crc32Buff...)
@@ -305,12 +307,14 @@ func (db *DB) WriteRecordBuffQueueData() {
 			dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY|os.O_APPEND, 0644)
 			if err != nil {
 				db.recordBuffWriteErrs[k] <- err
+				db.recordBuffPool.Put(r)
 				continue
 			}
 			_, err = dbFile.Write(r)
 			if err != nil {
-				db.recordBuffWriteErrs[k] <- err
 				dbFile.Close()
+				db.recordBuffWriteErrs[k] <- err
+				db.recordBuffPool.Put(r)
 				continue
 			}
 			dbFile.Close()
@@ -318,7 +322,7 @@ func (db *DB) WriteRecordBuffQueueData() {
 			db.size += int64(len(r))
 			db.Unlock()
 			db.recordBuffWriteErrs[k] <- nil
-			db.recordBufPool.Put(r)
+			db.recordBuffPool.Put(r)
 		}
 	}
 }

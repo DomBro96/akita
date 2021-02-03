@@ -216,11 +216,12 @@ func (e *Engine) Register(slaveHost string, notifier chan struct{}) {
 }
 
 // Start start akita server service.
-func (e *Engine) Start(server *http.Server) {
+func (e *Engine) Start(server *http.Server, dfsInterval int64, dbsInterval int64) {
 	logger.Infoln("akita server starting... ")
 	if err := server.ListenAndServe(); err != nil {
 		logger.Fatalf("start http server error %v", err)
 	}
+	go e.db.WriteRecordBuffQueueData()
 }
 
 // Close close server, stop provide service.
@@ -234,4 +235,9 @@ func (e *Engine) Close(server *http.Server) {
 	}
 	defer e.db.Close()
 	logger.Infoln("akita server stopped. ")
+}
+
+// TimeExecute execute engine timing tasks, currently hard-coded
+// Currently DB.DataFileSync() and DbSync() are executed regularly
+func (e *Engine) TimeExecute(dfsInterval int64, dbsInterval int) {
 }

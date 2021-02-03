@@ -13,12 +13,14 @@ import (
 )
 
 var (
-	port         = flag.String("port", "3664", "akita listening port.")
-	master       = flag.String("master_addr", "localhost", "master node ip address. ")
-	slaves       = flag.String("slaves_addr", "", "slaves nodes ip address set. ")
-	dataFilePath = flag.String("data_file", "/usr/local/akdata.dat", "akita data file path. ")
-	useCache     = flag.Bool("use_cache", true, "use lru cache.")
-	cacheLimit   = flag.Int("cache_limit", 1000, "maximum number of caches.")
+	port                 = flag.String("port", "3664", "akita listening port.")
+	master               = flag.String("master_addr", "localhost", "master node ip address. ")
+	slaves               = flag.String("slaves_addr", "", "slaves nodes ip address set. ")
+	dataFilePath         = flag.String("data_file", "/usr/local/akdata.dat", "akita data file path. ")
+	useCache             = flag.Bool("use_cache", true, "use lru cache.")
+	cacheLimit           = flag.Int("cache_limit", 1000, "maximum number of caches.")
+	dataFileSyncInterval = flag.Int64("dfs_interval", 1, "data fille synchronization interval, in seconds.")
+	dbSyncInterval       = flag.Int64("dbs_interval", 500, "db master-slaves synchronization interval, in milliseconds.")
 )
 
 func main() {
@@ -29,14 +31,15 @@ func main() {
 	http.HandleFunc("/akita/sync/", handler.Sync)
 
 	server := &http.Server{Addr: ":" + *port, Handler: nil}
+	// start akita listening
+	db.GetEngine().Start(server, *dataFileSyncInterval, *dbSyncInterval)
+
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, os.Kill)
 
-	// start akita listening
-	db.GetEngine().Start(server)
-
+	// TODO move to engine's method
 	go func() {
-		// TODO TimeEvent todo
+
 		dfsTicker := time.NewTicker(time.Second)
 		for {
 			select {
@@ -45,9 +48,6 @@ func main() {
 			}
 		}
 	}()
-
-	go db.GetEngine().GetDB().WriteRecordBuffQueueData()
-
 	if !db.GetEngine().IsMaster() {
 		go func() {
 			for {

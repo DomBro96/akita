@@ -32,8 +32,10 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, os.Kill)
 
+	// start akita listening
+	db.GetEngine().Start(server)
+
 	go func() {
-		db.GetEngine().Start(server) // start akita listening
 		// TODO TimeEvent todo
 		dfsTicker := time.NewTicker(time.Second)
 		for {

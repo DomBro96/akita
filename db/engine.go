@@ -30,7 +30,6 @@ type Engine struct {
 }
 
 var (
-	bp     *common.BytePool
 	engine *Engine
 )
 

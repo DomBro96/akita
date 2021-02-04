@@ -51,15 +51,15 @@ curl -X GET "http://master_intranet_ip:port/akita/del?key=key1"
 #### TODO list
 
 ```
-1. ~~Optimize the use of locks, such as reducing lock granularity and reducing lock contention~~   **done** 
+1.~~Optimize the use of locks, such as reducing lock granularity and reducing lock contention~~   **done** 
 
-2. ~~Create a byte pool, reuse byte slices, reduce gc overhead~~ **done**
+2.~~Create a byte pool, reuse byte slices, reduce gc overhead~~ **done**
 
-3. Optimize code, such as server layer code and code structure **doing**
+3.Optimize code, such as server layer code and code structure **doing**
 
-4. Provide compact algorithms for data file
+4.Provide compact algorithms for data file
 
-5. AOF log
+5.AOF log
 
-6. client console
+6.client console
 ```

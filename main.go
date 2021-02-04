@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"time"
 )
 
 var (
@@ -19,7 +18,7 @@ var (
 	dataFilePath         = flag.String("data_file", "/usr/local/akdata.dat", "akita data file path. ")
 	useCache             = flag.Bool("use_cache", true, "use lru cache.")
 	cacheLimit           = flag.Int("cache_limit", 1000, "maximum number of caches.")
-	dataFileSyncInterval = flag.Int64("dfs_interval", 1, "data fille synchronization interval, in seconds.")
+	dataFileSyncInterval = flag.Int64("dfs_interval", 1000, "data fille synchronization interval, in milliseconds.")
 	dbSyncInterval       = flag.Int64("dbs_interval", 500, "db master-slaves synchronization interval, in milliseconds.")
 )
 
@@ -31,32 +30,10 @@ func main() {
 	http.HandleFunc("/akita/sync/", handler.Sync)
 
 	server := &http.Server{Addr: ":" + *port, Handler: nil}
-	// start akita listening
-	db.GetEngine().Start(server, *dataFileSyncInterval, *dbSyncInterval)
+	db.GetEngine().Start(server, *dataFileSyncInterval, *dbSyncInterval) // start akita listening
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, os.Kill)
-
-	// TODO move to engine's method
-	go func() {
-
-		dfsTicker := time.NewTicker(time.Second)
-		for {
-			select {
-			case <-dfsTicker.C:
-				db.GetEngine().GetDB().DataFileSync()
-			}
-		}
-	}()
-	if !db.GetEngine().IsMaster() {
-		go func() {
-			for {
-				db.GetEngine().DbSync()
-				time.Sleep(500 * time.Millisecond) // do sync request every half second
-			}
-		}()
-	}
-
 	select {
 	case <-interrupt:
 		db.GetEngine().Close(server) // recycle resources

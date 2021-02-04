@@ -27,6 +27,7 @@ type Engine struct {
 	notifiers map[string]chan struct{} // notifiers notify slaves can get data from
 	useCache  bool
 	cache     *hashTableLRUCache
+	stop      chan struct{}
 }
 
 var (
@@ -47,6 +48,7 @@ func InitializeEngine(master string, slaves []string, port string, dataFilePath 
 		db:        OpenDB(dataFilePath),
 		notifiers: make(map[string]chan struct{}),
 		useCache:  useCache,
+		stop:      make(chan struct{}),
 	}
 	if useCache {
 		engine.cache = newHashTableLRUCache(cacheLimit)
@@ -157,6 +159,10 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 // DbSync slaves server update data.
 func (e *Engine) DbSync() error {
 
+	if e.IsMaster() {
+		return nil
+	}
+
 	offset := e.db.GetSyncSize()
 	syncOffset := &pb.SyncOffset{
 		Offset: offset,
@@ -222,6 +228,7 @@ func (e *Engine) Start(server *http.Server, dfsInterval int64, dbsInterval int64
 		logger.Fatalf("start http server error %v", err)
 	}
 	go e.db.WriteRecordBuffQueueData()
+	go e.TimeExecute(dfsInterval, dbsInterval, e.stop)
 }
 
 // Close close server, stop provide service.
@@ -233,11 +240,26 @@ func (e *Engine) Close(server *http.Server) {
 		logger.Errorf("shut down http server error %v", err)
 		return
 	}
-	defer e.db.Close()
+	e.db.Close()
+	close(e.stop)
 	logger.Infoln("akita server stopped. ")
 }
 
 // TimeExecute execute engine timing tasks, currently hard-coded
 // Currently DB.DataFileSync() and DbSync() are executed regularly
-func (e *Engine) TimeExecute(dfsInterval int64, dbsInterval int) {
+func (e *Engine) TimeExecute(dfsInterval int64, dbsInterval int64, stop chan struct{}) {
+	dfsTicker := time.NewTicker(time.Duration(dfsInterval) * time.Millisecond)
+	defer dfsTicker.Stop()
+	dbsTicker := time.NewTicker(time.Duration(dbsInterval) * time.Millisecond)
+	defer dbsTicker.Stop()
+	for {
+		select {
+		case <-dfsTicker.C:
+			e.db.DataFileSync()
+		case <-dbsTicker.C:
+			e.DbSync()
+		case <-stop:
+			return
+		}
+	}
 }

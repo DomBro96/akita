@@ -19,12 +19,18 @@ type DB struct {
 	dfPath string
 	size   int64 // next insert offset
 	iTable *indexTable
+
 	// uses a buffered channel to pass write data,
 	// a gr that writes data specifically reads recordBuffQueue and writes data to the db file.
 	// this is design is to avoid using locks in I/O, "use communication to share data"
 	recordBuffQueue chan []byte
+
 	// write data errors are passed through recordBuffWriteErrs in current gr and write data gr
 	recordBuffWriteErrs map[uint32]chan error
+
+	// recordBuffWriter witch read record buff from recordBuffQueue write the data to data file
+	recordBuffWriter func()
+
 	// recordBuffPool reduces the consumption caused by GC recycling byte slices.
 	// Get byte slice from recordBuffPool and write it into data file, and put it back to recordBuffPool after success
 	recordBuffPool *common.BytePool
@@ -61,6 +67,35 @@ func OpenDB(fPath string) *DB {
 		recordBuffQueue:     make(chan []byte, 100),
 		recordBuffWriteErrs: make(map[uint32]chan error),
 		recordBuffPool:      common.NewBytePool(100, 2*consts.M),
+	}
+	// todo opt this code.
+	db.recordBuffWriter = func() {
+		for {
+			select {
+			case r := <-db.recordBuffQueue:
+				k := common.CreateCrc32(r)
+				db.recordBuffWriteErrs[k] = make(chan error)
+				dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY|os.O_APPEND, 0644)
+				if err != nil {
+					db.recordBuffWriteErrs[k] <- err
+					db.recordBuffPool.Put(r)
+					continue
+				}
+				_, err = dbFile.Write(r)
+				if err != nil {
+					dbFile.Close()
+					db.recordBuffWriteErrs[k] <- err
+					db.recordBuffPool.Put(r)
+					continue
+				}
+				dbFile.Close()
+				db.Lock()
+				db.size += int64(len(r))
+				db.Unlock()
+				db.recordBuffWriteErrs[k] <- nil
+				db.recordBuffPool.Put(r)
+			}
+		}
 	}
 	return db
 }

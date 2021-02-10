@@ -227,7 +227,7 @@ func (e *Engine) Start(server *http.Server, dfsInterval int64, dbsInterval int64
 	if err := server.ListenAndServe(); err != nil {
 		logger.Fatalf("start http server error %v", err)
 	}
-	go e.db.WriteRecordBuffQueueData()
+	go e.db.recordBuffWriter()
 	go e.TimeExecute(dfsInterval, dbsInterval, e.stop)
 }
 
@@ -262,4 +262,9 @@ func (e *Engine) TimeExecute(dfsInterval int64, dbsInterval int64, stop chan str
 			return
 		}
 	}
+}
+
+// DbReload call db's Reload()
+func (e *Engine) DbReload() error {
+	return e.db.Reload()
 }

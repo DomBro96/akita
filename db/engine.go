@@ -223,12 +223,12 @@ func (e *Engine) Register(slaveHost string, notifier chan struct{}) {
 
 // Start start akita server service.
 func (e *Engine) Start(server *http.Server, dfsInterval int64, dbsInterval int64) {
+	go e.db.recordBuffWriter()
+	go e.TimeExecute(dfsInterval, dbsInterval, e.stop)
 	logger.Infoln("akita server starting... ")
 	if err := server.ListenAndServe(); err != nil {
 		logger.Fatalf("start http server error %v", err)
 	}
-	go e.db.recordBuffWriter()
-	go e.TimeExecute(dfsInterval, dbsInterval, e.stop)
 }
 
 // Close close server, stop provide service.

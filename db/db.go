@@ -271,17 +271,17 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 }
 
 func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) {
-	ksBuff, err := common.Int32ToByteSlice(record.dateHeader.Ks)
+	ksBuff, err := common.Int32ToByteSlice(record.header.Ks)
 	if err != nil {
 		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
-	vsBuff, err := common.Int32ToByteSlice(record.dateHeader.Vs)
+	vsBuff, err := common.Int32ToByteSlice(record.header.Vs)
 	if err != nil {
 		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
-	flagBuff, err := common.Int32ToByteSlice(record.dateHeader.Flag)
+	flagBuff, err := common.Int32ToByteSlice(record.header.Flag)
 	if err != nil {
 		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err

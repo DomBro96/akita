@@ -25,7 +25,7 @@ func Test_WriteRecord(t *testing.T) {
 	t.Logf("test write record =====> key: %s,  value: %v, ks: %d, vs: %d. \n", key, value, ks, vs)
 
 	record := &dataRecord{
-		dateHeader: &dataHeader{
+		header: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(vs),
 			Flag: 1,
@@ -60,7 +60,7 @@ func Test_WriteRecordNoCrc32(t *testing.T) {
 	t.Logf("test write record no crc32=====> key: %s,  value: %v, ks: %d, vs: %d. \n", key, nil, ks, 0)
 
 	record := &dataRecord{
-		dateHeader: &dataHeader{
+		header: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(0),
 			Flag: 2,
@@ -142,7 +142,7 @@ func Test_WriteSyncData(t *testing.T) {
 	t.Logf("test write sync data =====> key: %s,  value: %v, ks: %d, vs: %d. \n", key, value, ks, vs)
 
 	record := &dataRecord{
-		dateHeader: &dataHeader{
+		header: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(vs),
 			Flag: 1,
@@ -174,7 +174,7 @@ func Test_WriteSyncData(t *testing.T) {
 	t.Logf("test write sync data =====> key1: %s,  value1: %v, ks1: %d, vs1: %d. \n", key1, value1, ks1, vs1)
 
 	record1 := &dataRecord{
-		dateHeader: &dataHeader{
+		header: &dataHeader{
 			Ks:   int32(ks1),
 			Vs:   int32(vs1),
 			Flag: 1,
@@ -237,7 +237,7 @@ func aktiaWriteRecord(db *DB, key string, value []byte) {
 	ks, vs := len(keyBytes), len(value)
 
 	record := &dataRecord{
-		dateHeader: &dataHeader{
+		header: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(vs),
 			Flag: 1,

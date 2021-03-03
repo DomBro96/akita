@@ -71,7 +71,7 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 	}
 	ks := len(keyBuf)
 	dr := &dataRecord{
-		dateHeader: &dataHeader{
+		header: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(length),
 			Flag: consts.FlagWrite,
@@ -138,7 +138,7 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 	keyBuf := common.StringToByteSlice(key)
 	ks := len(keyBuf)
 	dr := &dataRecord{
-		dateHeader: &dataHeader{
+		header: &dataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(0),
 			Flag: consts.FlagDelete,

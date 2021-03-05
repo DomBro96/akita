@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 // DB stands for the underlying storage
@@ -109,9 +110,7 @@ func (db *DB) GetSyncSize() int64 {
 
 // Reload reload database index table.
 func (db *DB) Reload() error {
-	db.Lock()
 	length := db.size
-	db.Unlock()
 	if length <= consts.LengthRecordHeader {
 		return nil
 	}
@@ -143,40 +142,55 @@ func (db *DB) UpdateTable(offset int64, length int64) error {
 
 // UpdateTableWithData update db index table with data buf.
 func (db *DB) UpdateTableWithData(offset int64, dataBuff []byte) error {
-	bufOffset, length := int64(0), int64(len(dataBuff))
-	for bufOffset < length {
-		ksBuf := dataBuff[bufOffset:(bufOffset + consts.LengthKs)]
-		vsBuf := dataBuff[(bufOffset + consts.LengthKs):(bufOffset + consts.LengthKVs)]
-		flagBuf := dataBuff[(bufOffset + consts.LengthKVs):(bufOffset + consts.LengthRecordHeader)]
+	buffOffset, length := int64(0), int64(len(dataBuff))
+	for buffOffset < length {
+		ksBuff := dataBuff[buffOffset:(buffOffset + consts.LengthKs)]
+		vsBuff := dataBuff[(buffOffset + consts.LengthKs):(buffOffset + consts.LengthKVs)]
+		flagBuff := dataBuff[(buffOffset + consts.LengthKVs):(buffOffset + consts.LengthKVs + consts.LengthFlag)]
+		expireAtBuff := dataBuff[(buffOffset + consts.LengthKVs + consts.LengthFlag):(buffOffset + consts.LengthRecordHeader)]
 
-		ks, err := common.ByteSliceToInt32(ksBuf)
+		ks, err := common.ByteSliceToInt32(ksBuff)
 		if err != nil {
+			logger.Errorf("turn byte slice to int32 error: %s", err)
 			return err
 		}
-		vs, err := common.ByteSliceToInt32(vsBuf)
+		vs, err := common.ByteSliceToInt32(vsBuff)
 		if err != nil {
+			logger.Errorf("turn byte slice to int32 error: %s", err)
 			return err
 		}
-		keyBuf := dataBuff[(bufOffset + consts.LengthRecordHeader):(bufOffset + consts.LengthRecordHeader + int64(ks))]
+		keyBuf := dataBuff[(buffOffset + consts.LengthRecordHeader):(buffOffset + consts.LengthRecordHeader + int64(ks))]
 		key := common.ByteSliceToString(keyBuf)
-		flag, err := common.ByteSliceToInt32(flagBuf)
+		flag, err := common.ByteSliceToInt32(flagBuff)
 		if err != nil {
+			logger.Errorf("turn byte slice to int32 error: %s", err)
 			return err
 		}
+
 		if flag == consts.FlagDelete {
 			db.iTable.remove(key)
-			bufOffset += consts.LengthRecordHeader + int64(ks) + int64(vs)
+			buffOffset += consts.LengthRecordHeader + int64(ks) + int64(vs)
+			continue
+		}
+
+		expireAt, err := common.ByteSliceToInt64(expireAtBuff)
+		if err != nil {
+			logger.Errorf("turn byte slice to int64 error: %s", err)
+			return err
+		}
+		if expireAt != 0 && time.Unix(expireAt, 0).Before(time.Now()) {
+			db.iTable.remove(key)
+			buffOffset += consts.LengthRecordHeader + int64(ks) + int64(vs) + consts.LengthCrc32
 			continue
 		}
 
 		rs := consts.LengthRecordHeader + int(ks) + int(vs) + consts.LengthCrc32
 		ri := recordIndex{
-			offset: offset + bufOffset,
+			offset: offset + buffOffset,
 			size:   int64(rs),
 		}
-
 		db.iTable.put(key, &ri)
-		bufOffset += int64(rs)
+		buffOffset += int64(rs)
 	}
 	return nil
 }
@@ -286,10 +300,17 @@ func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) 
 		logger.Errorf("turn int32 to byte slice error: %s", err)
 		return nil, err
 	}
+	expireAtBuff, err := common.Int64ByteSlice(record.header.expireAt)
+	if err != nil {
+		logger.Errorf("turn int64 to byte slice error: %s", err)
+		return nil, err
+	}
+
 	recordBuff := db.recordBuffPool.Get()
 	recordBuff = append(recordBuff, ksBuff...)
 	recordBuff = append(recordBuff, vsBuff...)
 	recordBuff = append(recordBuff, flagBuff...)
+	recordBuff = append(recordBuff, expireAtBuff...)
 	recordBuff = append(recordBuff, record.key...)
 	recordBuff = append(recordBuff, record.value...)
 

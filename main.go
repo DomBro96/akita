@@ -16,7 +16,7 @@ var (
 	master               = flag.String("master_addr", "localhost", "master node ip address. ")
 	slaves               = flag.String("slaves_addr", "", "slaves nodes ip address set. ")
 	dataFilePath         = flag.String("data_file", "/usr/local/akdata.dat", "akita data file path. ")
-	useCache             = flag.Bool("use_cache", true, "use lru cache.")
+	cacheTurnOn          = flag.Bool("cache_turn_on", true, "use lru cache.")
 	cacheLimit           = flag.Int("cache_limit", 1000, "maximum number of caches.")
 	dataFileSyncInterval = flag.Int64("dfs_interval", 1000, "data fille synchronization interval, in milliseconds.")
 	dbSyncInterval       = flag.Int64("dbs_interval", 500, "db master-slaves synchronization interval, in milliseconds.")
@@ -42,7 +42,7 @@ func main() {
 }
 
 func init() {
-	db.InitializeEngine(*master, strings.Split(*slaves, ","), *port, *dataFilePath, *useCache, *cacheLimit)
+	db.InitializeEngine(*master, strings.Split(*slaves, ","), *port, *dataFilePath, *cacheTurnOn, *cacheLimit)
 	err := db.GetEngine().GetDB().Reload()
 	if err != nil {
 		logger.Fatalf("reload data base error: %v", err)

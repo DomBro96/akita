@@ -17,8 +17,25 @@ func ByteSliceToInt32(bufByte []byte) (int32, error) {
 	return i, err
 }
 
+// ByteSliceToInt64 use big end way read bytes to int32
+func ByteSliceToInt64(bufByte []byte) (int64, error) {
+	buf := bytes.NewBuffer(bufByte)
+	var i int64
+	err := binary.Read(buf, binary.BigEndian, &i)
+	return i, err
+}
+
 // Int32ToByteSlice use big end way write int32 to bytes
 func Int32ToByteSlice(i int32) ([]byte, error) {
+	s1 := make([]byte, 0)
+	buf := bytes.NewBuffer(s1)
+	err := binary.Write(buf, binary.BigEndian, i)
+	bufByte := buf.Bytes()
+	return bufByte, err
+}
+
+// Int64ByteSlice use big end way write int64 to bytes
+func Int64ByteSlice(i int64) ([]byte, error) {
 	s1 := make([]byte, 0)
 	buf := bytes.NewBuffer(s1)
 	err := binary.Write(buf, binary.BigEndian, i)

@@ -11,7 +11,8 @@ const (
 	LengthKs           = 4
 	LengthVs           = 4
 	LengthFlag         = 4
+	LengthExpireAt     = 8
 	LengthCrc32        = 4
 	LengthKVs          = LengthKs + LengthVs
-	LengthRecordHeader = LengthKs + LengthVs + LengthFlag
+	LengthRecordHeader = LengthKs + LengthVs + LengthFlag + LengthExpireAt
 )

@@ -39,7 +39,7 @@ func (h *keyExpireHeap) pop() *keyExpire {
 	h.size--
 
 	// dynamic expansion
-	if h.size <= cap(h.keyExpires)/2 && cap(h.keyExpires) > h.cap {
+	if h.size <= len(h.keyExpires)/2 && h.size > h.cap {
 		nks := make([]*keyExpire, h.size)
 		for j := 0; j < h.size; j++ {
 			nks[j] = h.keyExpires[j]
@@ -68,26 +68,27 @@ func (h *keyExpireHeap) pop() *keyExpire {
 func (h *keyExpireHeap) push(k *keyExpire) {
 	h.Lock()
 	defer h.Unlock()
+
 	i := h.size
 	// dynamic expansion
-	if i == h.cap-1 {
-		nks := make([]*keyExpire, 2*h.cap)
-		for j := 0; j < h.cap; j++ {
+	if h.size == len(h.keyExpires) {
+		nks := make([]*keyExpire, 2*h.size)
+		for j := 0; j < len(h.keyExpires); j++ {
 			nks[j] = h.keyExpires[j]
 		}
 		h.keyExpires = nks
 	}
-	h.size++
 
 	for i > 0 {
 		// parent node index
-		parentIdx := (i - 1) / 2
-		if h.keyExpires[parentIdx].seconds <= k.seconds {
+		pi := (i - 1) / 2
+		if h.keyExpires[pi].seconds <= k.seconds {
 			break
 		}
 		// parent node dive
-		h.keyExpires[i] = h.keyExpires[parentIdx]
-		i = parentIdx
+		h.keyExpires[i] = h.keyExpires[pi]
+		i = pi
 	}
 	h.keyExpires[i] = k
+	h.size++
 }

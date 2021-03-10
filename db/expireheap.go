@@ -18,6 +18,10 @@ type (
 	}
 )
 
+func (k *keyExpire) less(k1 *keyExpire) bool {
+	return k.seconds < k1.seconds
+}
+
 func newKeyExpireHeap(c int) *keyExpireHeap {
 	return &keyExpireHeap{
 		keyExpires: make([]*keyExpire, c),
@@ -52,10 +56,10 @@ func (h *keyExpireHeap) pop() *keyExpire {
 	for i*2+1 < h.size {
 		// child node index
 		ci, rci := i*2+1, i*2+2
-		if rci > h.size && h.keyExpires[rci].seconds < h.keyExpires[ci].seconds {
+		if rci < h.size && h.keyExpires[rci].less(h.keyExpires[ci]) {
 			ci = rci
 		}
-		if h.keyExpires[ci].seconds > tail.seconds {
+		if tail.less(h.keyExpires[ci]) {
 			break
 		}
 		h.keyExpires[i] = h.keyExpires[ci]
@@ -82,7 +86,7 @@ func (h *keyExpireHeap) push(k *keyExpire) {
 	for i > 0 {
 		// parent node index
 		pi := (i - 1) / 2
-		if h.keyExpires[pi].seconds <= k.seconds {
+		if !k.less(h.keyExpires[pi]) {
 			break
 		}
 		// parent node dive

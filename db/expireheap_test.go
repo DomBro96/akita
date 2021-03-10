@@ -82,5 +82,67 @@ func Test_Push(t *testing.T) {
 }
 
 func Test_Pop(t *testing.T) {
+	h := newKeyExpireHeap(10)
+	en := &keyExpire{
+		key:     "k0",
+		seconds: 10,
+	}
+	en1 := &keyExpire{
+		key:     "k1",
+		seconds: 9,
+	}
+	en2 := &keyExpire{
+		key:     "k2",
+		seconds: 8,
+	}
+	en3 := &keyExpire{
+		key:     "k3",
+		seconds: 7,
+	}
+	en4 := &keyExpire{
+		key:     "k4",
+		seconds: 6,
+	}
+	en5 := &keyExpire{
+		key:     "k5",
+		seconds: 5,
+	}
+	en6 := &keyExpire{
+		key:     "k6",
+		seconds: 4,
+	}
+	en7 := &keyExpire{
+		key:     "k7",
+		seconds: 3,
+	}
+	en8 := &keyExpire{
+		key:     "k8",
+		seconds: 2,
+	}
+	en9 := &keyExpire{
+		key:     "k9",
+		seconds: 1,
+	}
+	en10 := &keyExpire{
+		key:     "k10",
+		seconds: 0,
+	}
 
+	h.push(en)
+	h.push(en1)
+	h.push(en2)
+	h.push(en3)
+	h.push(en4)
+	h.push(en5)
+	h.push(en6)
+	h.push(en7)
+	h.push(en8)
+	h.push(en9)
+	h.push(en10)
+
+	for i := 0; i < 11; i++ {
+		k := h.pop()
+		t.Logf("k expire key: %s, seconds: %d ", k.key, k.seconds)
+		t.Logf("key expire heap size: %d,", h.size)
+	}
 }

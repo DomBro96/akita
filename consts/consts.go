@@ -8,6 +8,7 @@ const (
 const (
 	FlagWrite          = 1
 	FlagDelete         = 2
+	FlagExpire         = 3
 	LengthKs           = 4
 	LengthVs           = 4
 	LengthFlag         = 4

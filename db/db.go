@@ -29,15 +29,16 @@ type DB struct {
 	// write data errors are passed through recordBuffWriteErrs in current gr and write data gr
 	recordBuffWriteErrs map[uint32]chan error
 
-	// recordBuffWriter witch read record buff from recordBuffQueue write the data to data file
-	recordBuffWriter func()
-
 	// recordBuffPool reduces the consumption caused by GC recycling byte slices.
 	// Get byte slice from recordBuffPool and write it into data file, and put it back to recordBuffPool after success
 	recordBuffPool *common.BytePool
+
+	// expire uses small top heap to save expired keys
+	expire *keyExpireHeap
 }
 
-// OpenDB create a db object with data file path..
+// OpenDB create a db object with data file path.
+// TODO: add args.
 func OpenDB(fPath string) *DB {
 	dir := filepath.Dir(fPath)
 	ok, err := common.FileIsExit(dir)
@@ -68,36 +69,9 @@ func OpenDB(fPath string) *DB {
 		recordBuffQueue:     make(chan []byte, 100),
 		recordBuffWriteErrs: make(map[uint32]chan error),
 		recordBuffPool:      common.NewBytePool(100, 2*consts.M),
+		expire:              newKeyExpireHeap(1000),
 	}
-	// todo opt this code.
-	db.recordBuffWriter = func() {
-		for {
-			select {
-			case r := <-db.recordBuffQueue:
-				k := common.CreateCrc32(r)
-				db.recordBuffWriteErrs[k] = make(chan error)
-				dbFile, err := os.OpenFile(db.dfPath, os.O_WRONLY|os.O_APPEND, 0644)
-				if err != nil {
-					db.recordBuffWriteErrs[k] <- err
-					db.recordBuffPool.Put(r)
-					continue
-				}
-				_, err = dbFile.Write(r)
-				if err != nil {
-					dbFile.Close()
-					db.recordBuffWriteErrs[k] <- err
-					db.recordBuffPool.Put(r)
-					continue
-				}
-				dbFile.Close()
-				db.Lock()
-				db.size += int64(len(r))
-				db.Unlock()
-				db.recordBuffWriteErrs[k] <- nil
-				db.recordBuffPool.Put(r)
-			}
-		}
-	}
+
 	return db
 }
 
@@ -178,10 +152,17 @@ func (db *DB) UpdateTableWithData(offset int64, dataBuff []byte) error {
 			logger.Errorf("turn byte slice to int64 error: %s", err)
 			return err
 		}
+
 		if expireAt != 0 && time.Unix(expireAt, 0).Before(time.Now()) {
 			db.iTable.remove(key)
 			buffOffset += consts.LengthRecordHeader + int64(ks) + int64(vs) + consts.LengthCrc32
 			continue
+		} else if expireAt != 0 {
+			ke := &keyExpire{
+				key:     key,
+				seconds: int64(time.Unix(expireAt, 0).Sub(time.Now()).Seconds()),
+			}
+			db.expire.push(ke)
 		}
 
 		rs := consts.LengthRecordHeader + int(ks) + int(vs) + consts.LengthCrc32
@@ -191,6 +172,7 @@ func (db *DB) UpdateTableWithData(offset int64, dataBuff []byte) error {
 		}
 		db.iTable.put(key, &ri)
 		buffOffset += int64(rs)
+
 	}
 	return nil
 }

@@ -225,6 +225,7 @@ func (e *Engine) Register(slaveHost string, notifier chan struct{}) {
 func (e *Engine) Start(server *http.Server, dfsInterval int64, dbsInterval int64) {
 	go e.db.WriteRecordBuffQueueData()
 	go e.TimeExecute(dfsInterval, dbsInterval, e.stop)
+	go e.ExpireKeyManagement()
 	logger.Infoln("akita server starting... ")
 	if err := server.ListenAndServe(); err != nil {
 		logger.Fatalf("start http server error %v", err)
@@ -267,4 +268,31 @@ func (e *Engine) TimeExecute(dfsInterval int64, dbsInterval int64, stop chan str
 // DbReload call db's Reload()
 func (e *Engine) DbReload() error {
 	return e.db.Reload()
+}
+
+// ExpireKeyManagement manage expired keys and delete them in cache, index, and data files
+func (e *Engine) ExpireKeyManagement() {
+	de := e.db.expire
+	for {
+		ek := de.pop()
+		if ek == nil {
+			continue
+		}
+		<-time.After(time.Duration(ek.seconds))
+		e.cache.remove(ek.key)
+		e.db.iTable.remove(ek.key)
+		keyBuf := common.StringToByteSlice(ek.key)
+		ks := len(keyBuf)
+		dr := &dataRecord{
+			header: &dataHeader{
+				Ks:   int32(ks),
+				Vs:   int32(0),
+				Flag: consts.FlagDelete,
+			},
+			key:   keyBuf,
+			value: nil,
+		}
+		e.db.WriteRecordNoCrc32(dr)
+	}
+
 }

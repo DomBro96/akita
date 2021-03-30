@@ -1,9 +1,9 @@
 package db
 
 import (
-	"akita/akerrors"
 	"akita/common"
 	"akita/consts"
+	akerrors "akita/errors"
 	"akita/logger"
 	"errors"
 	"os"

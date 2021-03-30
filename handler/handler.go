@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"akita/akerrors"
-	"akita/akhttp"
 	"akita/common"
 	"akita/consts"
 	"akita/db"
+	"akita/errors"
+	akhttp "akita/http"
 	"akita/logger"
 	"akita/pb"
 	"io/ioutil"
@@ -27,7 +27,7 @@ func Save(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if len(common.StringToByteSlice(key)) > 10*consts.K {
-		akhttp.WriteResponse(w, http.StatusBadRequest, akerrors.ErrKeySize)
+		akhttp.WriteResponse(w, http.StatusBadRequest, errors.ErrKeySize)
 		return
 	}
 	_, file, err := req.FormFile("file")
@@ -135,7 +135,7 @@ func Sync(w http.ResponseWriter, req *http.Request) {
 
 	syncData := &pb.SyncData{}
 	if err != nil {
-		if err == akerrors.ErrNoDataUpdate {
+		if err == errors.ErrNoDataUpdate {
 			notifier := make(chan struct{})
 			db.GetEngine().Register(req.Host, notifier)
 			select {

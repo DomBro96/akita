@@ -1,9 +1,9 @@
 package db
 
 import (
-	"akita/akhttp"
 	"akita/common"
 	"akita/consts"
+	akhttp "akita/http"
 	"akita/logger"
 	"akita/pb"
 	"bytes"

@@ -1,4 +1,4 @@
-package akhttp
+package http
 
 import (
 	"akita/logger"

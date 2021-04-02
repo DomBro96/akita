@@ -62,6 +62,4 @@ curl -X GET "http://master_intranet_ip:port/akita/del?key=key1"
 5. WAL log, when the crash restarts, restore the database state  **High priority**
 
 6. Increase the memory structure to save the written data, periodically flush to the data file, adopt a similar LSM tree strategy, which will provide faster search efficiency  **High priority**
-
-
 ``` 

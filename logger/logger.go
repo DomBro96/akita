@@ -6,7 +6,6 @@ import (
 	"os"
 )
 
-// TODO: rename this package name --> aklog
 var (
 	Info    *log.Logger
 	Warning *log.Logger

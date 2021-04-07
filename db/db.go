@@ -216,7 +216,7 @@ func (db *DB) ReadRecord(offset int64, length int64) ([]byte, error) {
 }
 
 // WriteRecord write byte stream record to data file.
-func (db *DB) WriteRecord(record *dataRecord) error {
+func (db *DB) WriteRecord(record *DataRecord) error {
 	recordBuf, err := db.genRecordBuf(record, true)
 	if err != nil {
 		return err
@@ -234,7 +234,7 @@ func (db *DB) WriteRecord(record *dataRecord) error {
 }
 
 // WriteRecordNoCrc32 write byte stream record but no crc32 to data file.
-func (db *DB) WriteRecordNoCrc32(record *dataRecord) error {
+func (db *DB) WriteRecordNoCrc32(record *DataRecord) error {
 	rf, err := db.genRecordBuf(record, false)
 	if err != nil {
 		return err
@@ -266,7 +266,7 @@ func (db *DB) GetDataByOffset(offset int64) ([]byte, error) {
 	return data, nil
 }
 
-func (db *DB) genRecordBuf(record *dataRecord, checkCrc32 bool) ([]byte, error) {
+func (db *DB) genRecordBuf(record *DataRecord, checkCrc32 bool) ([]byte, error) {
 	ksBuff, err := common.Int32ToByteSlice(record.header.Ks)
 	if err != nil {
 		logger.Errorf("turn int32 to byte slice error: %s", err)

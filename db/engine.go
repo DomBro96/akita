@@ -70,8 +70,8 @@ func (e *Engine) Insert(key string, src multipart.File, length int64) (bool, err
 		return false, err
 	}
 	ks := len(keyBuf)
-	dr := &dataRecord{
-		header: &dataHeader{
+	dr := &DataRecord{
+		header: &DataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(length),
 			Flag: consts.FlagWrite,
@@ -137,8 +137,8 @@ func (e *Engine) Delete(key string) (bool, int64, error) {
 	}
 	keyBuf := common.StringToByteSlice(key)
 	ks := len(keyBuf)
-	dr := &dataRecord{
-		header: &dataHeader{
+	dr := &DataRecord{
+		header: &DataHeader{
 			Ks:   int32(ks),
 			Vs:   int32(0),
 			Flag: consts.FlagDelete,
@@ -283,8 +283,8 @@ func (e *Engine) ExpireKeyManagement() {
 		e.db.iTable.remove(ek.key)
 		keyBuf := common.StringToByteSlice(ek.key)
 		ks := len(keyBuf)
-		dr := &dataRecord{
-			header: &dataHeader{
+		dr := &DataRecord{
+			header: &DataHeader{
 				Ks:   int32(ks),
 				Vs:   int32(0),
 				Flag: consts.FlagDelete,

@@ -69,3 +69,7 @@ func (s *SkiplistMem) Usage() int {
 func (s *SkiplistMem) Limit() int {
 	return s.limit
 }
+
+func (s *SkiplistMem) Flush() error {
+	return nil
+}

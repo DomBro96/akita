@@ -19,4 +19,5 @@ type Memtable interface {
 	Size() int
 	Usage() int
 	Limit() int
+	Flush() error
 }

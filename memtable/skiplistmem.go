@@ -1,9 +1,6 @@
 package memtable
 
-import "crypto/rand"
-
-var _ MemtableNode = new(SkiplistMemNode)
-var _ Memtable = new(SkiplistMem)
+import "math/rand"
 
 const (
 	DefaultSkiplistMemNodeForwardLen  = 10
@@ -47,7 +44,7 @@ func (s *SkiplistMemNode) ExpireAt() int64 {
 	return s.expireAt
 }
 
-func (s *SkiplistMemNode) Less(n MemtableNode) bool {
+func (s *SkiplistMemNode) Less(n *SkiplistMemNode) bool {
 	return s.key < n.Key()
 }
 
@@ -75,7 +72,7 @@ func NewSkiplistMem(h int, lp float64) *SkiplistMem {
 	}
 }
 
-func (s *SkiplistMem) Insert(n MemtableNode) error {
+func (s *SkiplistMem) Insert(n *SkiplistMemNode) error {
 	if n == nil {
 		return nil
 	}
@@ -92,6 +89,11 @@ func (s *SkiplistMem) Insert(n MemtableNode) error {
 		}
 		update[i] = pN
 	}
+	for i := 0; i < level; i++ {
+		n.forwards[i] = update[i].forwards[i]
+		update[i].forwards[i] = n
+	}
+
 	return nil
 }
 
@@ -99,11 +101,11 @@ func (s *SkiplistMem) Delete(k string) error {
 	return nil
 }
 
-func (s *SkiplistMem) Update(k string, n MemtableNode) error {
+func (s *SkiplistMem) Update(k string, n *SkiplistMemNode) error {
 	return nil
 }
 
-func (s *SkiplistMem) Get(k string) MemtableNode {
+func (s *SkiplistMem) Get(k string) *SkiplistMemNode {
 	pN := s.head
 	for i := s.maxLevel - 1; i >= 0; i-- {
 		for pN.forwards[i] != nil && pN.forwards[i].key < k {
@@ -116,7 +118,7 @@ func (s *SkiplistMem) Get(k string) MemtableNode {
 	return nil
 }
 
-func (s *SkiplistMem) Display() []MemtableNode {
+func (s *SkiplistMem) Display() []*SkiplistMemNode {
 	return nil
 }
 
@@ -143,7 +145,7 @@ func (s *SkiplistMem) Flush() error {
 func (s *SkiplistMem) RandomLevel() int {
 	level := 1
 	n := int(1 / s.levelP)
-	for i := 0; rand.Int(n) == 1 && i < s.height; i++ {
+	for i := 0; rand.Intn(n) == 1 && i < s.height; i++ {
 		level++
 	}
 	return level

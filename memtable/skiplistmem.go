@@ -82,43 +82,65 @@ func (s *SkiplistMem) Insert(n *SkiplistMemNode) error {
 		update[i] = s.head
 	}
 
-	pN := s.head
+	curN := s.head
 	for i := level - 1; i >= 0; i++ {
-		for pN.forwards[i] != nil && pN.forwards[i].Less(n) {
-			pN = pN.forwards[i]
+		for curN.forwards[i] != nil && curN.forwards[i].Less(n) {
+			curN = curN.forwards[i]
 		}
-		update[i] = pN
+		update[i] = curN
 	}
 	for i := 0; i < level; i++ {
-		n.forwards[i] = update[i].forwards[i]
+		// replace the same key node, O(1)
+		fwN := update[i].forwards[i]
+		for fwN != nil && fwN.key == n.key {
+			fwN = fwN.forwards[i]
+		}
+		n.forwards[i] = fwN
 		update[i].forwards[i] = n
 	}
-
+	if level > s.maxLevel {
+		s.maxLevel = level
+	}
+	s.size++
 	return nil
 }
 
 func (s *SkiplistMem) Delete(k string) error {
-	return nil
-}
-
-func (s *SkiplistMem) Update(k string, n *SkiplistMemNode) error {
+	update := make([]*SkiplistMemNode, s.maxLevel)
+	curN := s.head
+	for i := s.maxLevel - 1; i >= 0; i-- {
+		for curN.forwards[i] != nil && curN.forwards[i].key < k {
+			curN = curN.forwards[i]
+		}
+		update[i] = curN
+	}
+	if curN.forwards[0] != nil && curN.forwards[0].key == k {
+		for i := s.maxLevel; i >= 0; i-- {
+			if update[i].forwards[i] != nil && update[i].forwards[i].key == k {
+				update[i].forwards[i] = update[i].forwards[i].forwards[i]
+			}
+		}
+		s.size--
+	}
 	return nil
 }
 
 func (s *SkiplistMem) Get(k string) *SkiplistMemNode {
-	pN := s.head
+	curN := s.head
 	for i := s.maxLevel - 1; i >= 0; i-- {
-		for pN.forwards[i] != nil && pN.forwards[i].key < k {
-			pN = pN.forwards[i]
+		for curN.forwards[i] != nil && curN.forwards[i].key < k {
+			curN = curN.forwards[i]
 		}
 	}
-	if pN.forwards[0] != nil && pN.forwards[0].key == k {
-		return pN.forwards[0]
+	if curN.forwards[0] != nil && curN.forwards[0].key == k {
+		return curN.forwards[0]
 	}
 	return nil
 }
 
 func (s *SkiplistMem) Display() []*SkiplistMemNode {
+
+	curNode := s.head
 	return nil
 }
 

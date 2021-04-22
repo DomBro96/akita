@@ -36,7 +36,7 @@ func (w *WAL) Flush(key string, value []byte) error {
 	return nil
 }
 
-func (w *WAL) RestoreMemtableState() memtable.Memtable {
+func (w *WAL) RestoreMemtableState() *memtable.SkiplistMem {
 	return nil
 }
 

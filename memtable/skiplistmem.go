@@ -1,10 +1,16 @@
 package memtable
 
-import "math/rand"
+import (
+	"math/rand"
+	"time"
+)
 
 const (
-	DefaultSkiplistMemNodeForwardLen  = 10
+	DefaultSkiplistMemNodeForwardLen  = 5
 	DefaultSkiplistMemSkipProbability = 0.5
+	DefaultSkiplistHeight             = 5
+	DefaultSkiplistMaxLevel           = 1
+	ExpireAtNeverExpire               = -1
 )
 
 // SkiplistMemNode implements MemtableNode which as SkiplistMem‘s node.
@@ -22,6 +28,12 @@ type SkiplistMemNode struct {
 func NewSkiplistNode(k string, v []byte, e int64, l int, fl int) *SkiplistMemNode {
 	if fl <= 0 {
 		fl = DefaultSkiplistMemNodeForwardLen
+	}
+	if time.Unix(e, 0).Before(time.Now()) {
+		e = ExpireAtNeverExpire
+	}
+	if l < 0 {
+		l = 0
 	}
 	return &SkiplistMemNode{
 		key:      k,
@@ -50,7 +62,8 @@ func (s *SkiplistMemNode) Less(n *SkiplistMemNode) bool {
 
 // SkiplistMem implements Memtable which is a is a lock-free skip list data structure.
 type SkiplistMem struct {
-	head     *SkiplistMemNode
+	head *SkiplistMemNode
+	// height of skiplist
 	height   int
 	maxLevel int
 	levelP   float64
@@ -64,15 +77,24 @@ func NewSkiplistMem(h int, lp float64) *SkiplistMem {
 	if lp <= 0 || lp >= 1 {
 		lp = DefaultSkiplistMemSkipProbability
 	}
+	if h <= 0 {
+		h = DefaultSkiplistHeight
+	}
 	return &SkiplistMem{
 		head:     NewSkiplistNode("", nil, 0, 0, h),
 		height:   h,
-		maxLevel: 1,
+		maxLevel: DefaultSkiplistMaxLevel,
 		levelP:   lp,
 	}
 }
 
-func (s *SkiplistMem) Insert(n *SkiplistMemNode) error {
+func (s *SkiplistMem) Insert(k string, v []byte, e int64) error {
+	level := s.RandomLevel()
+	n := NewSkiplistNode(k, v, e, level, s.height)
+	return s.insertNode(n)
+}
+
+func (s *SkiplistMem) insertNode(n *SkiplistMemNode) error {
 	if n == nil {
 		return nil
 	}
@@ -139,9 +161,13 @@ func (s *SkiplistMem) Get(k string) *SkiplistMemNode {
 }
 
 func (s *SkiplistMem) Display() []*SkiplistMemNode {
-
-	curNode := s.head
-	return nil
+	ns := make([]*SkiplistMemNode, 0, s.size)
+	curN := s.head
+	for curN != nil && curN.forwards[0] != nil {
+		ns = append(ns, curN.forwards[0])
+		curN = curN.forwards[0]
+	}
+	return ns
 }
 
 func (s *SkiplistMem) Full() bool {

@@ -18,8 +18,7 @@ type SkiplistMemNode struct {
 	key      string
 	value    []byte
 	expireAt int64
-	// forwards save the node pointer of level[n]
-	forwards []*SkiplistMemNode
+	forwards []*SkiplistMemNode // forwards save the node pointer of level[n]
 	level    int
 }
 
@@ -62,9 +61,8 @@ func (s *SkiplistMemNode) Less(n *SkiplistMemNode) bool {
 
 // SkiplistMem implements Memtable which is a is a lock-free skip list data structure.
 type SkiplistMem struct {
-	head *SkiplistMemNode
-	// height of skiplist
-	height   int
+	head     *SkiplistMemNode
+	height   int // height of skiplist
 	maxLevel int
 	levelP   float64
 	size     int

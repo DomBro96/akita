@@ -16,6 +16,7 @@ type WAL struct {
 	memTyp  int
 }
 
+// OpenWAL create a new WAL
 func OpenWAL(wfp string) *WAL {
 	wf, err := os.OpenFile(wfp, os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
@@ -29,6 +30,7 @@ func OpenWAL(wfp string) *WAL {
 	}
 }
 
+// Flush write the key and value to walFile, and use os.sync.
 func (w *WAL) Flush(key string, value []byte) error {
 	if !w.enable {
 		return nil

@@ -1,6 +1,7 @@
 package memtable
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -13,7 +14,7 @@ const (
 	ExpireAtNeverExpire               = -1
 )
 
-// SkiplistMemNode implements MemtableNode which as SkiplistMem‘s node.
+// SkiplistMemNode represent SkiplistMem‘s node.
 type SkiplistMemNode struct {
 	key      string
 	value    []byte
@@ -59,7 +60,7 @@ func (s *SkiplistMemNode) Less(n *SkiplistMemNode) bool {
 	return s.key < n.Key()
 }
 
-// SkiplistMem implements Memtable which is a is a lock-free skip list data structure.
+// SkiplistMem represent Memtable which is a is a lock-free skip list data structure.
 type SkiplistMem struct {
 	head     *SkiplistMemNode
 	height   int // height of skiplist
@@ -96,20 +97,22 @@ func (s *SkiplistMem) insertNode(n *SkiplistMemNode) error {
 	if n == nil {
 		return nil
 	}
-	level := s.RandomLevel()
-	update := make([]*SkiplistMemNode, level)
-	for i := 0; i < level; i++ {
+
+	update := make([]*SkiplistMemNode, n.level)
+	for i := 0; i < n.level; i++ {
 		update[i] = s.head
 	}
-
+	fmt.Println("height:", s.height)
+	fmt.Println("level:", n.level)
 	curN := s.head
-	for i := level - 1; i >= 0; i++ {
+	for i := n.level - 1; i >= 0; i-- {
+		fmt.Println("i:", i)
 		for curN.forwards[i] != nil && curN.forwards[i].Less(n) {
 			curN = curN.forwards[i]
 		}
 		update[i] = curN
 	}
-	for i := 0; i < level; i++ {
+	for i := 0; i < n.level; i++ {
 		// replace the same key node, O(1)
 		fwN := update[i].forwards[i]
 		for fwN != nil && fwN.key == n.key {
@@ -118,8 +121,8 @@ func (s *SkiplistMem) insertNode(n *SkiplistMemNode) error {
 		n.forwards[i] = fwN
 		update[i].forwards[i] = n
 	}
-	if level > s.maxLevel {
-		s.maxLevel = level
+	if n.level > s.maxLevel {
+		s.maxLevel = n.level
 	}
 	s.size++
 	return nil
@@ -191,7 +194,7 @@ func (s *SkiplistMem) Flush() error {
 func (s *SkiplistMem) RandomLevel() int {
 	level := 1
 	n := int(1 / s.levelP)
-	for i := 0; rand.Intn(n) == 1 && i < s.height; i++ {
+	for i := 0; rand.Intn(n) == 1 && i < s.height-1; i++ {
 		level++
 	}
 	return level

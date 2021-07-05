@@ -50,4 +50,18 @@ func TestNewSkiplistMem(t *testing.T) {
 func TestInsert(t *testing.T) {
 	s := NewSkiplistMem(0, 0)
 	s.Insert("k1", []byte{}, 1650703962)
+	s.Insert("k80", []byte{}, 1650703962)
+	s.Insert("k7", []byte{}, 1650703962)
+	s.Insert("k0", []byte{}, 1650703962)
+	s.Insert("k9", []byte{}, 1650703962)
+	s.Insert("k500", []byte{}, 1650703962)
+	s.Insert("k-1", []byte{}, 1650703962)
+	s.Insert("k7", []byte{}, 1650703962)
+	s.Insert("k09", []byte{}, 1650703962)
+	s.Insert("k22", []byte{}, 1650703962)
+	s.Insert("k5", []byte{}, 1650703962)
+
+	for _, n := range s.Display() {
+		t.Log(n.key + "\n")
+	}
 }

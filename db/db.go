@@ -1,6 +1,7 @@
 package db
 
 import (
+	"akita/bytepool"
 	"akita/common"
 	"akita/consts"
 	akerrors "akita/errors"
@@ -31,7 +32,7 @@ type DB struct {
 
 	// recordBuffPool reduces the consumption caused by GC recycling byte slices.
 	// Get byte slice from recordBuffPool and write it into data file, and put it back to recordBuffPool after success
-	recordBuffPool *common.BytePool
+	recordBuffPool *bytepool.BytePool
 
 	// expire uses small top heap to save expired keys
 	expire *keyExpireHeap
@@ -68,7 +69,7 @@ func OpenDB(fPath string) *DB {
 		iTable:              newIndexTable(),
 		recordBuffQueue:     make(chan []byte, 100),
 		recordBuffWriteErrs: make(map[uint32]chan error),
-		recordBuffPool:      common.NewBytePool(100, 2*consts.M),
+		recordBuffPool:      bytepool.NewBytePool(100, 2*consts.M),
 		expire:              newKeyExpireHeap(1000),
 	}
 

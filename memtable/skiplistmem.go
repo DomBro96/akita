@@ -1,7 +1,6 @@
 package memtable
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 )
@@ -19,7 +18,7 @@ type SkiplistMemNode struct {
 	key      string
 	value    []byte
 	expireAt int64
-	forwards []*SkiplistMemNode // forwards save the node pointer of level[n]
+	forwards []*SkiplistMemNode // forwards save the forward node pointer of level[n]
 	level    int
 }
 
@@ -62,13 +61,13 @@ func (s *SkiplistMemNode) Less(n *SkiplistMemNode) bool {
 
 // SkiplistMem represent Memtable which is a is a lock-free skip list data structure.
 type SkiplistMem struct {
-	head     *SkiplistMemNode
-	height   int // height of skiplist
-	maxLevel int
-	levelP   float64
-	size     int
-	usage    int
-	limit    int
+	head         *SkiplistMemNode
+	height       int // height of skiplist
+	highestLevel int // the highest level of the skiplist node, highestLevel <= height
+	levelP       float64
+	size         int
+	usage        int
+	limit        int
 }
 
 // NewSkiplistMem create a new SkiplistMem.
@@ -80,10 +79,10 @@ func NewSkiplistMem(h int, lp float64) *SkiplistMem {
 		h = DefaultSkiplistHeight
 	}
 	return &SkiplistMem{
-		head:     NewSkiplistNode("", nil, 0, 0, h),
-		height:   h,
-		maxLevel: DefaultSkiplistMaxLevel,
-		levelP:   lp,
+		head:         NewSkiplistNode("", nil, 0, 0, h),
+		height:       h,
+		highestLevel: DefaultSkiplistMaxLevel,
+		levelP:       lp,
 	}
 }
 
@@ -102,11 +101,8 @@ func (s *SkiplistMem) insertNode(n *SkiplistMemNode) error {
 	for i := 0; i < n.level; i++ {
 		update[i] = s.head
 	}
-	fmt.Println("height:", s.height)
-	fmt.Println("level:", n.level)
 	curN := s.head
 	for i := n.level - 1; i >= 0; i-- {
-		fmt.Println("i:", i)
 		for curN.forwards[i] != nil && curN.forwards[i].Less(n) {
 			curN = curN.forwards[i]
 		}
@@ -121,24 +117,24 @@ func (s *SkiplistMem) insertNode(n *SkiplistMemNode) error {
 		n.forwards[i] = fwN
 		update[i].forwards[i] = n
 	}
-	if n.level > s.maxLevel {
-		s.maxLevel = n.level
+	if n.level > s.highestLevel {
+		s.highestLevel = n.level
 	}
 	s.size++
 	return nil
 }
 
 func (s *SkiplistMem) Delete(k string) error {
-	update := make([]*SkiplistMemNode, s.maxLevel)
+	update := make([]*SkiplistMemNode, s.highestLevel)
 	curN := s.head
-	for i := s.maxLevel - 1; i >= 0; i-- {
+	for i := s.highestLevel - 1; i >= 0; i-- {
 		for curN.forwards[i] != nil && curN.forwards[i].key < k {
 			curN = curN.forwards[i]
 		}
 		update[i] = curN
 	}
 	if curN.forwards[0] != nil && curN.forwards[0].key == k {
-		for i := s.maxLevel; i >= 0; i-- {
+		for i := s.highestLevel - 1; i >= 0; i-- {
 			if update[i].forwards[i] != nil && update[i].forwards[i].key == k {
 				update[i].forwards[i] = update[i].forwards[i].forwards[i]
 			}
@@ -150,7 +146,7 @@ func (s *SkiplistMem) Delete(k string) error {
 
 func (s *SkiplistMem) Get(k string) *SkiplistMemNode {
 	curN := s.head
-	for i := s.maxLevel - 1; i >= 0; i-- {
+	for i := s.highestLevel - 1; i >= 0; i-- {
 		for curN.forwards[i] != nil && curN.forwards[i].key < k {
 			curN = curN.forwards[i]
 		}

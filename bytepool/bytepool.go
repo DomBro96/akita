@@ -1,4 +1,4 @@
-package common
+package bytepool
 
 // BytePool implements a leaky pool of []byte in the form of a bounded
 type BytePool struct {

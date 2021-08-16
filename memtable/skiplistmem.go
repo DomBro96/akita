@@ -2,7 +2,9 @@ package memtable
 
 import (
 	"math/rand"
+	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 const (
@@ -61,13 +63,15 @@ func (s *SkiplistNode) Less(n *SkiplistNode) bool {
 
 // SkiplistMem represent Memtable which is a is a lock-free skip list data structure.
 type SkiplistMem struct {
-	head         *SkiplistNode
-	height       int // height of skiplist
-	highestLevel int // the highest level of the skiplist node, highestLevel <= height
-	levelP       float64
-	size         int
-	usage        int
-	limit        int
+	head           *SkiplistNode
+	height         int // height of skiplist
+	highestLevel   int // the highest level of the skiplist node, highestLevel <= height
+	levelP         float64
+	size           int
+	usage          int
+	limit          int
+	lastInsertNode *SkiplistNode
+	lastDeleteNode *SkiplistNode
 }
 
 // NewSkiplistMem create a new SkiplistMem.
@@ -79,10 +83,12 @@ func NewSkiplistMem(h int, lp float64) *SkiplistMem {
 		h = DefaultSkiplistHeight
 	}
 	return &SkiplistMem{
-		head:         NewSkiplistNode("", nil, 0, 0, h),
-		height:       h,
-		highestLevel: DefaultSkiplistMaxLevel,
-		levelP:       lp,
+		head:           NewSkiplistNode("", nil, 0, 0, h),
+		height:         h,
+		highestLevel:   DefaultSkiplistMaxLevel,
+		levelP:         lp,
+		lastInsertNode: NewSkiplistNode("", nil, 0, 0, h),
+		lastDeleteNode: NewSkiplistNode("", nil, 0, 0, h),
 	}
 }
 
@@ -95,6 +101,18 @@ func (s *SkiplistMem) Insert(k string, v []byte, e int64) error {
 func (s *SkiplistMem) insertNode(n *SkiplistNode) error {
 	if n == nil {
 		return nil
+	}
+
+	rotationTimes := 0
+	lin := s.lastInsertNode
+	oldLin := lin
+	for !atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(lin.forwards[0])), nil, (unsafe.Pointer(n))) {
+		if rotationTimes > 2 {
+			for lin.forwards[0] != nil {
+				lin = lin.forwards[0]
+			}
+		}
+		rotationTimes++
 	}
 
 	update := make([]*SkiplistNode, n.level)
@@ -121,6 +139,7 @@ func (s *SkiplistMem) insertNode(n *SkiplistNode) error {
 		s.highestLevel = n.level
 	}
 	s.size++
+	atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(s.lastInsertNode)), unsafe.Pointer(oldLin), unsafe.Pointer(n))
 	return nil
 }
 

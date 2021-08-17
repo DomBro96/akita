@@ -1,6 +1,9 @@
 package memtable
 
 import (
+	"fmt"
+	"strconv"
+	"sync"
 	"testing"
 )
 
@@ -112,5 +115,66 @@ func TestGet(t *testing.T) {
 
 	n1 := s.Get("nil key")
 	t.Logf("n1 is nil ? %t \n", n1 == nil)
+
+}
+
+func TestConcurrentInsert(t *testing.T) {
+	s := NewSkiplistMem(0, 0)
+
+	var wg sync.WaitGroup
+
+	for i := 15; i >= 0; i-- {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			s.Insert(k, []byte{}, 1650703962)
+		}("k" + strconv.FormatInt(int64(i), 10))
+	}
+
+	wg.Wait()
+
+	for _, n := range s.Display() {
+		t.Log(n.key + "\n")
+	}
+	t.Logf("skiplist len: %d \n", len(s.Display()))
+}
+
+func TestConcurrentDelete(t *testing.T) {
+	s := NewSkiplistMem(0, 0)
+
+	var (
+		wg  sync.WaitGroup
+		wg1 sync.WaitGroup
+	)
+
+	for i := 99; i >= 0; i-- {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			if err := s.Insert(k, []byte{}, 1650703962); err != nil {
+				fmt.Printf("insert error: %v \n", err)
+			}
+		}("k" + strconv.FormatInt(int64(i), 10))
+	}
+
+	wg.Wait()
+	t.Logf("skiplist len: %d \n", len(s.Display()))
+
+	for i := 50; i >= 0; i-- {
+		wg1.Add(1)
+		go func(k string) {
+			defer wg1.Done()
+			if err := s.Delete(k); err != nil {
+				fmt.Printf("delete error: %v \n", err)
+			}
+		}("k" + strconv.FormatInt(int64(i), 10))
+	}
+
+	wg1.Wait()
+
+	for _, n := range s.Display() {
+		t.Log(n.key + "\n")
+	}
+	t.Logf("skiplist len: %d \n", len(s.Display()))
 
 }

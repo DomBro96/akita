@@ -69,14 +69,17 @@ func (s *SkiplistNode) Less(n *SkiplistNode) bool {
 
 // SkiplistMem represent Memtable which is a is a lock-free skip list data structure.
 type SkiplistMem struct {
-	head           *SkiplistNode
-	height         int // height of skiplist
-	highestLevel   int // the highest level of the skiplist node, highestLevel <= height
-	levelP         float64
-	size           int
-	usage          int
-	limit          int
-	casState       int32
+	head         *SkiplistNode
+	height       int // height of skiplist
+	highestLevel int // the highest level of the skiplist node, highestLevel <= height
+	levelP       float64
+	size         int
+	usage        int
+	limit        int
+	casState     int32 // use cas to update SkiplistMem synchronously. Note that the ABA problem of cas cannot be solved currently
+
+	// To prevent a gr from hanging up during the cas process, causing other cas grs to fall into rotation,
+	// when the rotation is greater than maxCasRotation, set the value for casState again
 	maxCasRotation int
 }
 
@@ -155,7 +158,7 @@ func (s *SkiplistMem) Delete(k string) error {
 		}
 		rotation++
 	}
-	atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateDelete, SkiplistCasStateDefault)
+	defer atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateDelete, SkiplistCasStateDefault)
 
 	update := make([]*SkiplistNode, s.highestLevel)
 	curN := s.head

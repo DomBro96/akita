@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"time"
-	"unsafe"
 )
 
 const (
@@ -13,6 +12,13 @@ const (
 	DefaultSkiplistHeight             = 5
 	DefaultSkiplistMaxLevel           = 1
 	ExpireAtNeverExpire               = -1
+	SkiplistMaxCasRotation            = 3
+)
+
+const (
+	SkiplistCasStateDefault = iota
+	SkiplistCasStateInsert
+	SkiplistCasStateDelete
 )
 
 // SkiplistNode represent SkiplistMem‘s node.
@@ -70,8 +76,8 @@ type SkiplistMem struct {
 	size           int
 	usage          int
 	limit          int
-	lastInsertNode *SkiplistNode
-	lastDeleteNode *SkiplistNode
+	casState       int32
+	maxCasRotation int
 }
 
 // NewSkiplistMem create a new SkiplistMem.
@@ -87,8 +93,9 @@ func NewSkiplistMem(h int, lp float64) *SkiplistMem {
 		height:         h,
 		highestLevel:   DefaultSkiplistMaxLevel,
 		levelP:         lp,
-		lastInsertNode: NewSkiplistNode("", nil, 0, 0, h),
-		lastDeleteNode: NewSkiplistNode("", nil, 0, 0, h),
+		lastCASVisit:   NewSkiplistNode("", nil, 0, 0, h),
+		casState:       SkiplistCasStateDefault,
+		maxCasRotation: SkiplistMaxCasRotation,
 	}
 }
 
@@ -103,17 +110,14 @@ func (s *SkiplistMem) insertNode(n *SkiplistNode) error {
 		return nil
 	}
 
-	rotationTimes := 0
-	lin := s.lastInsertNode
-	oldLin := lin
-	for !atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(lin.forwards[0])), nil, (unsafe.Pointer(n))) {
-		if rotationTimes > 2 {
-			for lin.forwards[0] != nil {
-				lin = lin.forwards[0]
-			}
+	rotation := 0
+	for !atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateDefault, SkiplistCasStateInsert) {
+		if rotation > s.maxCasRotation {
+			s.casState = SkiplistCasStateDefault
 		}
-		rotationTimes++
+		rotation++
 	}
+	defer atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateInsert, SkiplistCasStateDefault)
 
 	update := make([]*SkiplistNode, n.level)
 	for i := 0; i < n.level; i++ {
@@ -138,12 +142,22 @@ func (s *SkiplistMem) insertNode(n *SkiplistNode) error {
 	if n.level > s.highestLevel {
 		s.highestLevel = n.level
 	}
+
 	s.size++
-	atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(s.lastInsertNode)), unsafe.Pointer(oldLin), unsafe.Pointer(n))
 	return nil
 }
 
 func (s *SkiplistMem) Delete(k string) error {
+
+	rotation := 0
+	for !atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateDefault, SkiplistCasStateDelete) {
+		if rotation > s.maxCasRotation {
+			s.casState = SkiplistCasStateDefault
+		}
+		rotation++
+	}
+	atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateDelete, SkiplistCasStateDefault)
+
 	update := make([]*SkiplistNode, s.highestLevel)
 	curN := s.head
 	for i := s.highestLevel - 1; i >= 0; i-- {
@@ -152,14 +166,17 @@ func (s *SkiplistMem) Delete(k string) error {
 		}
 		update[i] = curN
 	}
-	if curN.forwards[0] != nil && curN.forwards[0].key == k {
-		for i := s.highestLevel - 1; i >= 0; i-- {
-			if update[i].forwards[i] != nil && update[i].forwards[i].key == k {
-				update[i].forwards[i] = update[i].forwards[i].forwards[i]
-			}
-		}
-		s.size--
+
+	if curN.forwards[0] == nil || curN.forwards[0].key != k {
+		return nil
 	}
+
+	for i := s.highestLevel - 1; i >= 0; i-- {
+		if update[i].forwards[i] != nil && update[i].forwards[i].key == k {
+			update[i].forwards[i] = update[i].forwards[i].forwards[i]
+		}
+	}
+	s.size--
 	return nil
 }
 

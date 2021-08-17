@@ -93,7 +93,6 @@ func NewSkiplistMem(h int, lp float64) *SkiplistMem {
 		height:         h,
 		highestLevel:   DefaultSkiplistMaxLevel,
 		levelP:         lp,
-		lastCASVisit:   NewSkiplistNode("", nil, 0, 0, h),
 		casState:       SkiplistCasStateDefault,
 		maxCasRotation: SkiplistMaxCasRotation,
 	}

@@ -12,7 +12,8 @@ const (
 	DefaultSkiplistHeight             = 5
 	DefaultSkiplistMaxLevel           = 1
 	ExpireAtNeverExpire               = -1
-	SkiplistMaxCasRotation            = 3
+
+	SkiplistMaxCasSpin = 3
 )
 
 const (
@@ -78,9 +79,9 @@ type SkiplistMem struct {
 	limit        int
 	casState     int32 // use cas to update SkiplistMem synchronously. Note that the ABA problem of cas cannot be solved currently
 
-	// To prevent a gr from hanging up during the cas process, causing other cas grs to fall into rotation,
-	// when the rotation is greater than maxCasRotation, set the value for casState again
-	maxCasRotation int
+	// To prevent a gr from hanging up during the cas process, causing other cas grs to fall into spin,
+	// when the number of spin exceeds maxCasSpin, reset the casState again
+	maxCasSpin int
 }
 
 // NewSkiplistMem create a new SkiplistMem.
@@ -92,12 +93,12 @@ func NewSkiplistMem(h int, lp float64) *SkiplistMem {
 		h = DefaultSkiplistHeight
 	}
 	return &SkiplistMem{
-		head:           NewSkiplistNode("", nil, 0, 0, h),
-		height:         h,
-		highestLevel:   DefaultSkiplistMaxLevel,
-		levelP:         lp,
-		casState:       SkiplistCasStateDefault,
-		maxCasRotation: SkiplistMaxCasRotation,
+		head:         NewSkiplistNode("", nil, 0, 0, h),
+		height:       h,
+		highestLevel: DefaultSkiplistMaxLevel,
+		levelP:       lp,
+		casState:     SkiplistCasStateDefault,
+		maxCasSpin:   SkiplistMaxCasSpin,
 	}
 }
 
@@ -112,12 +113,12 @@ func (s *SkiplistMem) insertNode(n *SkiplistNode) error {
 		return nil
 	}
 
-	rotation := 0
+	spin := 0
 	for !atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateDefault, SkiplistCasStateInsert) {
-		if rotation > s.maxCasRotation {
+		if spin > s.maxCasSpin {
 			s.casState = SkiplistCasStateDefault
 		}
-		rotation++
+		spin++
 	}
 	defer atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateInsert, SkiplistCasStateDefault)
 
@@ -151,12 +152,12 @@ func (s *SkiplistMem) insertNode(n *SkiplistNode) error {
 
 func (s *SkiplistMem) Delete(k string) error {
 
-	rotation := 0
+	spin := 0
 	for !atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateDefault, SkiplistCasStateDelete) {
-		if rotation > s.maxCasRotation {
+		if spin > s.maxCasSpin {
 			s.casState = SkiplistCasStateDefault
 		}
-		rotation++
+		spin++
 	}
 	defer atomic.CompareAndSwapInt32(&s.casState, SkiplistCasStateDelete, SkiplistCasStateDefault)
 

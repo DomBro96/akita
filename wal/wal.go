@@ -17,8 +17,8 @@ type WAL struct {
 }
 
 // OpenWAL create a new WAL
-func OpenWAL(wfp string) *WAL {
-	wf, err := os.OpenFile(wfp, os.O_WRONLY|os.O_APPEND, 0644)
+func OpenWAL(f string) *WAL {
+	wf, err := os.OpenFile(f, os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		logger.Fatalf("open wal file error: %v", err)
 	}
